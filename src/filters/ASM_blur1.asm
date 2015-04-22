@@ -12,6 +12,12 @@ global ASM_blur1
 %define OFFSET_RED              1
 %define OFFSET_GREEN            2
 %define OFFSET_BLUE             3
+
+section .rodata
+    mascara_limpiar: dw 0xF, 0xF, 0xF, 0xF, 0x0, 0x0, 0x0, 0x0 
+    division_9: dw 0x9, 0x9, 0x9, 0x9, 0x1, 0x1, 0x1, 0x1 
+
+section .text
 ASM_blur1:
     push rbp
     mov rbp, rsp
@@ -68,30 +74,37 @@ ASM_blur1:
         punpckhbw xmm5, xmm7 ; xmm5 = | basura | p8 |
 
         paddw xmm0, xmm1 ; xmm0 = | p1 + p4 | p0 + p3 |
-        paddw xmm0, mm2 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 |
+        paddw xmm0, xmm2 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 |
         paddw xmm3, xmm4 ; xmm3 = | basura | p2 + p5 |
-        paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p7 |
+        paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p8 |
+        
+        ; limpio la basura en xmm3 para poder supar tranqui
+        movdqu xmm8, [mascara_limpiar]
+        pand xmm3, xmm8 ; xmm3 = | ceros | p2 + p5 + p8 |
+        paddw xmm0, xmm3 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
+        movdqu xmm3, xmm0 ; xmm3 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
+        psrldq xmm0, 8 ; xmm0 = | ceros | p1 + p4 + p7 |
+        paddw xmm0, xmm3 ; xmm0 = | ceros | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
-        paddb xmm0, xmm1 ; suma de a bytes. xmm0 = | p0 + p3 | p1 + p4 | p2 + p5 | basura |
-        paddb xmm0, xmm2 ; suma de a bytes. xmm0 = | p0 + p3 + p6 | p1 + p4 + p7 | p2 + p5 + p8 | basura |
+        ; convierto a floats SP para hacer la division, tengo 4 canales de 32 bits
+        pxor xmm7, xmm7 ; xmm7 = ceros
+        punpcklwd xmm0, xmm7 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
+        cvtdq2ps xmm0, xmm0 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
-        movdqu xmm1, xmm0 ; xmm1 = xmm0
-        pslldq xmm1, 4 ; shift 4 bytes. xmm1 = | p1 + p4 + p7 | p2 + p5 + p8 | basura | ceros |
-        paddb xmm0, xmm1 ; suma de a bytes. xmm0 = | p0 + p3 + p6 + p1 + p4 + p7 | basura | basura | basura |
-        pslldq xmm1, 4 ; shift 4 bytes. xmm1 = | p2 + p5 + p8 | basura | ceros | ceros |
-        paddb xmm0, xmm1 ; deja en los 4 bytes mas altos de xmm0 la sumatoria de los 9 pixeles
-        ; xmm0 = | p0 + p3 + p6 + p1 + p4 + p7 + p2 + p5 + p8 | basura | basura | basura |
+        ; hago la division por 9 de cada canal
+        movdqu xmm8, [division_9]
+        divps xmm0, xmm8 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
-        mov QWORD rdi, 0x9999000000000000
-        movq xmm1, rdi
-        pslldq xmm1, 8 ; shift 4 bytes
+        ; paso devuelta a enteros de 32 bits:
+        cvtps2dq xmm0, xmm0 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+        ; paso a enteros de 16 bits
+        pxor xmm7, xmm7 ; xmm7 = ceros
+        packusdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+        ; paso a enteros de 8 bits
+        packuswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
-        divss xmm0, xmm1 ; aca quiero packed. no scalar
-
-        psrldq xmm0, 12 ; muevo el pixel a la parte baja de xmm0
-        movq xmm0, rsi
         lea rdi, [rbx + rcx]  ;rdi es donde empieza la matriz de 3x3: (0,0)
-        mov [rdi + r12 + PIXEL_SIZE], esi ; muevo el resultado al centro de la matriz
+        movd [rdi + r12 + PIXEL_SIZE], xmm0 ; muevo el resultado al centro de la matriz
 
         add rcx, PIXEL_SIZE
         jmp .ciclo
