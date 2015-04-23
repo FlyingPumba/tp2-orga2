@@ -7,6 +7,9 @@
 
 ; void ASM_blur1( uint32_t w, uint32_t h, uint8_t* data )
 global ASM_blur1
+extern malloc
+extern free
+
 %define PIXEL_SIZE              4 ; en bytes
 %define OFFSET_ALPHA 			0
 %define OFFSET_RED              1
@@ -21,32 +24,55 @@ section .text
 ASM_blur1:
     push rbp
     mov rbp, rsp
+    sub rsp, 8
     push rbx
     push r12
     push r13
     push r14
+    push r15
     ;*******
-    mov r12, rdi ; r12 <- width
-    mov r14, rdi ; r14 <- width
-    mov r13, rsi ; r13 <- height
     mov rbx, rdx ; rbx <- *data
+    mov r12, rdi ; r12 <- width
+    mov r13, rsi ; r13 <- height
 
-    sub QWORD r14, 2
-    shl r14, 2 ; r14 = (width - 2) * 4
+    shl rdi, 2 ; rdi = width * 4
+    call malloc
+    mov r14, rax ; r0, vector auxiliar
 
-    shl r12, 2 ; r12 = width * 4
+    mov rdi, r12
+    shl rdi, 2 ; rdi = width * 4
+    call malloc
+    mov r15, rax ; r1, vector auxiliar
 
-    mov rax, rdi
+    mov r9, r12
+    sub QWORD r9, 2
+    shl r9, 2 ; r9 = (width - 2) * 4
+
+    mov rax, r12 ; rax = width
     mul rsi
-    shl rax, 2
-    mov rdx, rax ; rdx <- 4*width * height
+    shl rax, 2 ; rax = 4 * width * height
+    mov rdx, rax ; rdx = 4 * width * height
     sub rdx, r12
-    sub rdx, r12
+    sub rdx, r12 ; rdx = 4 * width * height - 2 * width
 
     xor rcx, rcx ; contador de pixeles overall
     xor r8, r8 ; contador de pixeles a lo ancho
+
+    xor rdi, rdi
+    .ciclo_vectores:
+        cmp rdi, r12
+        jge .ciclo
+        lea rsi, [rbx + rdi]
+        mov DWORD esi, [rsi + 1*r12] ; copio un pixel
+        mov [r14 + rdi], esi ; pego un pixel
+        lea rsi, [rbx + rdi]
+        mov DWORD esi, [rsi + 2*r12] ; copio un pixel del siguiente
+        mov [r14 + rdi], esi ; pego un pixel
+        add rdi, PIXEL_SIZE
+        jmp .ciclo_vectores
+
     .ciclo:
-        cmp r8, r14
+        cmp r8, r9
         jl .procesar
         add rcx, 2*PIXEL_SIZE ; avanzo 2 pixeles, 1 por la fila actual y 1 por la siguiente fila
         xor r8, r8
@@ -119,10 +145,17 @@ ASM_blur1:
         add r8, PIXEL_SIZE
         jmp .ciclo
     .ciclo_fin:
+    mov rdi, r14
+    call free
+
+    mov rdi, r15
+    call free
     ;*******
+    pop r15
     pop r14
     pop r13
     pop r12
     pop rbx
+    add rsp, 8
     pop rbp
     ret
