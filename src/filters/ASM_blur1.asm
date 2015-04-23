@@ -14,8 +14,8 @@ global ASM_blur1
 %define OFFSET_BLUE             3
 
 section .rodata
-    mascara_limpiar: dw 0xF, 0xF, 0xF, 0xF, 0x0, 0x0, 0x0, 0x0 
-    division_9: dw 0x9, 0x9, 0x9, 0x9, 0x1, 0x1, 0x1, 0x1 
+    mascara_limpiar: dw 0xF, 0xF, 0xF, 0xF, 0x0, 0x0, 0x0, 0x0
+    division_9: dw 0x9, 0x9, 0x9, 0x9, 0x1, 0x1, 0x1, 0x1
 
 section .text
 ASM_blur1:
@@ -27,23 +27,32 @@ ASM_blur1:
     push r14
     ;*******
     mov r12, rdi ; r12 <- width
+    mov r14, rdi ; r14 <- width
     mov r13, rsi ; r13 <- height
     mov rbx, rdx ; rbx <- *data
 
-    sub QWORD rdi, 2 ; resto dos al ancho para no tener en cuenta el borde
-    sub QWORD rsi, 2 ; resto dos al alto para no tener en cuenta el borde
-    shl rdi, 2 ; multiplico rdi por 4
-    shl rsi, 2 ; multiplico rsi por 4
-    shl r12, 2 ; multiplico r12 por 4
+    sub QWORD r14, 2
+    shl r14, 2 ; r14 = (width - 2) * 4
 
-    mov rdx, rdi
-    add rdx, rsi ; rdx <- cantidad de bytes que tengo que recorrer
+    shl r12, 2 ; r12 = width * 4
 
-    xor rcx, rcx
-    add rcx, PIXEL_SIZE ; empiezo en el segundo pixel
+    mov rax, rdi
+    mul rsi
+    shl rax, 2
+    mov rdx, rax ; rdx <- 4*width * height
+    sub rdx, r12
+    sub rdx, r12
+
+    xor rcx, rcx ; contador de pixeles overall
+    xor r8, r8 ; contador de pixeles a lo ancho
     .ciclo:
+        cmp r8, r14
+        jl .procesar
+        add rcx, 2*PIXEL_SIZE ; avanzo 2 pixeles, 1 por la fila actual y 1 por la siguiente fila
+        xor r8, r8
+    .procesar:
         cmp rcx, rdx
-        je .ciclo_fin
+        jge .ciclo_fin
     	lea rdi, [rbx + rcx]  ;rdi es donde empieza la matriz de 3x3: (0,0)
         ; la matriz es:
         ; | p0 | p1 | p2 |
@@ -77,7 +86,7 @@ ASM_blur1:
         paddw xmm0, xmm2 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 |
         paddw xmm3, xmm4 ; xmm3 = | basura | p2 + p5 |
         paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p8 |
-        
+
         ; limpio la basura en xmm3 para poder supar tranqui
         movdqu xmm8, [mascara_limpiar]
         pand xmm3, xmm8 ; xmm3 = | ceros | p2 + p5 + p8 |
@@ -99,14 +108,15 @@ ASM_blur1:
         cvtps2dq xmm0, xmm0 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
         ; paso a enteros de 16 bits
         pxor xmm7, xmm7 ; xmm7 = ceros
-        packusdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+        packssdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
         ; paso a enteros de 8 bits
-        packuswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+        packsswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
         lea rdi, [rbx + rcx]  ;rdi es donde empieza la matriz de 3x3: (0,0)
         movd [rdi + r12 + PIXEL_SIZE], xmm0 ; muevo el resultado al centro de la matriz
 
         add rcx, PIXEL_SIZE
+        add r8, PIXEL_SIZE
         jmp .ciclo
     .ciclo_fin:
     ;*******
