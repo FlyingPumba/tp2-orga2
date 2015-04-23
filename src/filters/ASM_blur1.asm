@@ -67,7 +67,7 @@ ASM_blur1:
         mov [r14 + rdi], esi ; pego un pixel
         lea rsi, [rbx + rdi]
         mov DWORD esi, [rsi + 2*r12] ; copio un pixel del siguiente
-        mov [r14 + rdi], esi ; pego un pixel
+        mov [r15 + rdi], esi ; pego un pixel
         add rdi, PIXEL_SIZE
         jmp .ciclo_vectores
 
