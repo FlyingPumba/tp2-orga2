@@ -50,25 +50,55 @@ ASM_blur1:
     mov r9, r8
     sub r9, 8; r9 = width * 4 - 8 (ancho en bytes a recorrer)
 
+    xor rdi, rdi
+    .ciclo_vectores_inicial:
+        cmp rdi, r8
+        jge .procesar_fila
+        lea rsi, [rbx + rdi]
+        mov DWORD esi, [rsi + 1*r12] ; copio un pixel
+        mov [r15 + rdi], esi ; pego un pixel
+        add rdi, PIXEL_SIZE
+        jmp .ciclo_vectores_inicial
+
+    .procesar_fila:
     xor rcx, rcx ; contador de filas (en pixeles)
     .ciclo_fila:
-        xor rdx, rdx ; contador de columnas (en bytes)
-
         ; preparo rdi como registro auxiliar para levantar datos
         mov rax, r8
         mul rcx
         mov rdi, rax ; rdi = contador_filas * width * 4
+
+        ; cargo los nuevos vectores auxiliares
+        xor rdx, rdx ; contador de columnas (en bytes)
+        .ciclo_vectores_nuevos:
+            cmp rdx, r8
+            jge .procesar_columna
+            mov DWORD esi, [r15 + rdx] ; copio un pixel del vector auxiliar en la fila mas alta
+            mov [r14 + rdx], esi ; al vector auxiliar en la fila mas baja
+            ; cargo el nuevo pixel correspondiente en el vector auxiliar de la fila mas alta
+
+            lea rax, [rbx + rdi] ; rax apunta a donde empieza la fila actual
+            add rax, r8
+            add rax, r8 ; rax = rax + 2* (width * 4)
+            mov DWORD esi, [rax + rdx]
+            mov [r15 + rdx], esi
+
+            add rdx, PIXEL_SIZE
+            jmp .ciclo_vectores_nuevos
+
+        .procesar_columna:
+        xor rdx, rdx ; contador de columnas (en bytes)
         .ciclo_columna:
-            mov rsi, rdx
+            mov rsi, rdx ; rsi = contador_columnas (bytes)
             add rsi, rdi ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
             ; vamos a cargar una matriz de pixeles, que en memoria se veria:
             ; | p0 | p1 | p2 |
             ; | p3 | p4 | p5 |
             ; | p6 | p7 | p8 |
             ; (los numeros son simplemente indicativos, no indican precedencia)
-            movdqu xmm0, [rbx + rsi] ; xmm0 = | basura | p2 | p1 | p0 |
+            movdqu xmm0, [r14 + rdx] ; xmm0 = | basura | p2 | p1 | p0 |
+            movdqu xmm1, [r15 + rdx] ; xmm1 = | basura | p5 | p4 | p3 |
             add rsi, r8 ; rsi = rsi + width*4
-            movdqu xmm1, [rbx + rsi] ; xmm1 = | basura | p5 | p4 | p3 |
             add rsi, r8 ; rsi = rsi + width*4
             movdqu xmm2, [rbx + rsi] ; xmm2 = | basura | p8 | p7 | p6 |
 
