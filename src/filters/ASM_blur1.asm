@@ -17,8 +17,8 @@ extern free
 %define OFFSET_BLUE             3
 
 section .rodata
-    mascara_limpiar: dw 0xF, 0xF, 0xF, 0xF, 0x0, 0x0, 0x0, 0x0
-    division_9: dw 0x9, 0x9, 0x9, 0x9, 0x1, 0x1, 0x1, 0x1
+    mascara_limpiar: dw 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0x0, 0x0, 0x0, 0x0
+    division_9: dw 9, 9, 9, 9, 1, 1, 1, 1
 
 section .text
 ASM_blur1:
@@ -108,12 +108,12 @@ ASM_blur1:
             punpcklbw xmm0, xmm7 ; xmm0 = | p1 | p0 |
             punpckhbw xmm3, xmm7 ; xmm3 = | basura | p2 |
 
-            pxor xmm7, xmm7 ; xmm7 = ceros
+            ;pxor xmm7, xmm7 ; xmm7 = ceros
             movdqu xmm4, xmm1 ; xmm4 = xmm1
             punpcklbw xmm1, xmm7 ; xmm1 = | p4 | p3 |
             punpckhbw xmm4, xmm7 ; xmm4 = | basura | p5 |
 
-            pxor xmm7, xmm7 ; xmm7 = ceros
+            ;pxor xmm7, xmm7 ; xmm7 = ceros
             movdqu xmm5, xmm2 ; xmm5 = xmm2
             punpcklbw xmm2, xmm7 ; xmm2 = | p7 | p6 |
             punpckhbw xmm5, xmm7 ; xmm5 = | basura | p8 |
@@ -124,7 +124,7 @@ ASM_blur1:
             paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p8 |
 
             ; limpio la basura en xmm3 para poder sumar tranqui
-            movdqu xmm8, [mascara_limpiar]
+            movdqu xmm8, [mascara_limpiar] ; xmm8 = | 0 | 0 | 0 | 0 | F | F | F |F |
             pand xmm3, xmm8 ; xmm3 = | ceros | p2 + p5 + p8 |
             paddw xmm0, xmm3 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
             movdqu xmm3, xmm0 ; xmm3 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
@@ -132,7 +132,7 @@ ASM_blur1:
             paddw xmm0, xmm3 ; xmm0 = | ceros | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
             ; convierto a floats SP para hacer la division, tengo 4 canales de 32 bits
-            pxor xmm7, xmm7 ; xmm7 = ceros
+            ;pxor xmm7, xmm7 ; xmm7 = ceros
             punpcklwd xmm0, xmm7 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
             cvtdq2ps xmm0, xmm0 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
