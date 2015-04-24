@@ -141,9 +141,9 @@ ASM_blur1:
             ; paso devuelta a enteros de 32 bits:
             cvtps2dq xmm0, xmm0 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
             ; paso a enteros de 16 bits
-            packssdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+            packusdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
             ; paso a enteros de 8 bits
-            packsswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+            packuswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
             add rsi, PIXEL_SIZE ; incremento la columna en uno
             sub rsi, r8 ; vuelvo a ubicar rsi en la fila del centro de la matriz
