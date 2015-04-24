@@ -34,6 +34,7 @@ int run_blur(int c, char* src, char* dst){
     free(dataC);
   }
   bmp_save(dst,bmp);
+  bmp_delete(bmp);
   return 0;
 }
 
@@ -76,6 +77,8 @@ int run_merge(int c, char* src1, char* src2, char* dst, float value){
     free(data2C);
   }
   bmp_save(dst,bmp1);
+  bmp_delete(bmp1);
+  bmp_delete(bmp2);
   return 0;
 }
 
@@ -106,7 +109,7 @@ int run_hsl(int c, char* src, char* dst, float hh, float ss, float ll) {
     to24(w,h,dataC,data);
     free(dataC);
   }
-  
   bmp_save(dst,bmp);
+  bmp_delete(bmp);
   return 0;
 }
