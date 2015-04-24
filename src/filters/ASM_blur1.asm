@@ -18,7 +18,7 @@ extern free
 
 section .rodata
     mascara_limpiar: dw 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0x0, 0x0, 0x0, 0x0
-    division_9: dw 9, 9, 9, 9, 1, 1, 1, 1
+    division_9: dd 9, 9, 9, 9
 
 section .text
 ASM_blur1:
@@ -108,12 +108,10 @@ ASM_blur1:
             punpcklbw xmm0, xmm7 ; xmm0 = | p1 | p0 |
             punpckhbw xmm3, xmm7 ; xmm3 = | basura | p2 |
 
-            ;pxor xmm7, xmm7 ; xmm7 = ceros
             movdqu xmm4, xmm1 ; xmm4 = xmm1
             punpcklbw xmm1, xmm7 ; xmm1 = | p4 | p3 |
             punpckhbw xmm4, xmm7 ; xmm4 = | basura | p5 |
 
-            ;pxor xmm7, xmm7 ; xmm7 = ceros
             movdqu xmm5, xmm2 ; xmm5 = xmm2
             punpcklbw xmm2, xmm7 ; xmm2 = | p7 | p6 |
             punpckhbw xmm5, xmm7 ; xmm5 = | basura | p8 |
@@ -129,21 +127,20 @@ ASM_blur1:
             paddw xmm0, xmm3 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
             movdqu xmm3, xmm0 ; xmm3 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
             psrldq xmm0, 8 ; xmm0 = | ceros | p1 + p4 + p7 |
-            paddw xmm0, xmm3 ; xmm0 = | ceros | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
+            paddw xmm0, xmm3 ; xmm0 = | basura | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
             ; convierto a floats SP para hacer la division, tengo 4 canales de 32 bits
-            ;pxor xmm7, xmm7 ; xmm7 = ceros
             punpcklwd xmm0, xmm7 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
             cvtdq2ps xmm0, xmm0 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
             ; hago la division por 9 de cada canal
             movdqu xmm8, [division_9]
+            cvtdq2ps xmm8, xmm8 ; xmm8 = | 9, 9, 9, 9 | (cada 9 es un float SP)
             divps xmm0, xmm8 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
             ; paso devuelta a enteros de 32 bits:
             cvtps2dq xmm0, xmm0 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
             ; paso a enteros de 16 bits
-            pxor xmm7, xmm7 ; xmm7 = ceros
             packssdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
             ; paso a enteros de 8 bits
             packsswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
