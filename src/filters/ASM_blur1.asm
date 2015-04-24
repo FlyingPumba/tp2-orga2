@@ -44,107 +44,99 @@ ASM_blur1:
     call malloc
     mov r15, rax ; r1, vector auxiliar
 
-    mov r9, r12
-    sub QWORD r9, 2
-    shl r9, 2 ; r9 = (width - 2) * 4
+    mov r8, r12
+    shl r8, 2 ; r8 = width * 4 (ancho en bytes de la imagen)
 
-    mov rax, r12 ; rax = width
-    mul rsi
-    shl rax, 2 ; rax = 4 * width * height
-    mov rdx, rax ; rdx = 4 * width * height
-    sub rdx, r12
-    sub rdx, r12 ; rdx = 4 * width * height - 2 * width
+    mov r9, r8
+    sub r9, 8; r9 = width * 4 - 8 (ancho en bytes a recorrer)
 
-    xor rcx, rcx ; contador de pixeles overall
-    xor r8, r8 ; contador de pixeles a lo ancho
+    xor rcx, rcx ; contador de filas (en pixeles)
+    .ciclo_fila:
+        xor rdx, rdx ; contador de columnas (en bytes)
 
-    xor rdi, rdi
-    .ciclo_vectores:
-        cmp rdi, r12
-        jge .ciclo
-        lea rsi, [rbx + rdi]
-        mov DWORD esi, [rsi + 1*r12] ; copio un pixel
-        mov [r14 + rdi], esi ; pego un pixel
-        lea rsi, [rbx + rdi]
-        mov DWORD esi, [rsi + 2*r12] ; copio un pixel del siguiente
-        mov [r15 + rdi], esi ; pego un pixel
-        add rdi, PIXEL_SIZE
-        jmp .ciclo_vectores
+        ; preparo rdi como registro auxiliar para levantar datos
+        mov rax, r8
+        mul rcx
+        mov rdi, rax ; rdi = contador_filas * width * 4
+        .ciclo_columna:
+            mov rsi, rdx
+            add rsi, rdi ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
+            ; vamos a cargar una matriz de pixeles, que en memoria se veria:
+            ; | p0 | p1 | p2 |
+            ; | p3 | p4 | p5 |
+            ; | p6 | p7 | p8 |
+            ; (los numeros son simplemente indicativos, no indican precedencia)
+            movdqu xmm0, [rbx + rsi] ; xmm0 = | basura | p2 | p1 | p0 |
+            add rsi, r8 ; rsi = rsi + width*4
+            movdqu xmm1, [rbx + rsi] ; xmm1 = | basura | p5 | p4 | p3 |
+            add rsi, r8 ; rsi = rsi + width*4
+            movdqu xmm2, [rbx + rsi] ; xmm2 = | basura | p8 | p7 | p6 |
 
-    .ciclo:
-        cmp r8, r9
-        jl .procesar
-        add rcx, 2*PIXEL_SIZE ; avanzo 2 pixeles, 1 por la fila actual y 1 por la siguiente fila
-        xor r8, r8
-    .procesar:
-        cmp rcx, rdx
-        jge .ciclo_fin
-    	lea rdi, [rbx + rcx]  ;rdi es donde empieza la matriz de 3x3: (0,0)
-        ; la matriz es:
-        ; | p0 | p1 | p2 |
-        ; | p3 | p4 | p5 |
-        ; | p6 | p7 | p8 |
-        movdqu xmm0, [rdi] ; xmm0 = | basura | p2 | p1 | p0 |
-        movdqu xmm1, [rdi + 1*r12] ; xmm1 = | basura | p5 | p4 | p3 |
-        movdqu xmm2, [rdi + 2*r12] ; xmm2 = | basura | p8 | p7 | p6 |
+            ; ahora convierto todos los canales de 1 byte a canales de 2 bytes, para realizar las sumas sin romper nada.
+            ; entonces, cada pixel va a pasar a medir 8 bytes (64bits)
 
-        ; dos formas: shuffle vs. punpck
+            pxor xmm7, xmm7 ; xmm7 = ceros
+            movdqu xmm3, xmm0 ; xmm3 = xmm0
+            punpcklbw xmm0, xmm7 ; xmm0 = | p1 | p0 |
+            punpckhbw xmm3, xmm7 ; xmm3 = | basura | p2 |
 
-        ; ahora convierto todos los canales de 1 byte a canales de 2 bytes, para realizar las sumas sin romper nada.
-        ; entonces, cada pixel va a pasar a medir 8 bytes (64b)
+            pxor xmm7, xmm7 ; xmm7 = ceros
+            movdqu xmm4, xmm1 ; xmm4 = xmm1
+            punpcklbw xmm1, xmm7 ; xmm1 = | p4 | p3 |
+            punpckhbw xmm4, xmm7 ; xmm4 = | basura | p5 |
 
-        pxor xmm7, xmm7 ; xmm7 = ceros
-        movdqu xmm3, xmm0 ; xmm3 = xmm0
-        punpcklbw xmm0, xmm7 ; xmm0 = | p1 | p0 |
-        punpckhbw xmm3, xmm7 ; xmm3 = | basura | p2 |
+            pxor xmm7, xmm7 ; xmm7 = ceros
+            movdqu xmm5, xmm2 ; xmm5 = xmm2
+            punpcklbw xmm2, xmm7 ; xmm2 = | p7 | p6 |
+            punpckhbw xmm5, xmm7 ; xmm5 = | basura | p8 |
 
-        pxor xmm7, xmm7 ; xmm7 = ceros
-        movdqu xmm4, xmm1 ; xmm4 = xmm1
-        punpcklbw xmm1, xmm7 ; xmm1 = | p4 | p3 |
-        punpckhbw xmm4, xmm7 ; xmm4 = | basura | p5 |
+            paddw xmm0, xmm1 ; xmm0 = | p1 + p4 | p0 + p3 |
+            paddw xmm0, xmm2 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 |
+            paddw xmm3, xmm4 ; xmm3 = | basura | p2 + p5 |
+            paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p8 |
 
-        pxor xmm7, xmm7 ; xmm7 = ceros
-        movdqu xmm5, xmm2 ; xmm5 = xmm2
-        punpcklbw xmm2, xmm7 ; xmm2 = | p7 | p6 |
-        punpckhbw xmm5, xmm7 ; xmm5 = | basura | p8 |
+            ; limpio la basura en xmm3 para poder supar tranqui
+            movdqu xmm8, [mascara_limpiar]
+            pand xmm3, xmm8 ; xmm3 = | ceros | p2 + p5 + p8 |
+            paddw xmm0, xmm3 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
+            movdqu xmm3, xmm0 ; xmm3 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
+            psrldq xmm0, 8 ; xmm0 = | ceros | p1 + p4 + p7 |
+            paddw xmm0, xmm3 ; xmm0 = | ceros | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
-        paddw xmm0, xmm1 ; xmm0 = | p1 + p4 | p0 + p3 |
-        paddw xmm0, xmm2 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 |
-        paddw xmm3, xmm4 ; xmm3 = | basura | p2 + p5 |
-        paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p8 |
+            ; convierto a floats SP para hacer la division, tengo 4 canales de 32 bits
+            pxor xmm7, xmm7 ; xmm7 = ceros
+            punpcklwd xmm0, xmm7 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
+            cvtdq2ps xmm0, xmm0 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
 
-        ; limpio la basura en xmm3 para poder supar tranqui
-        movdqu xmm8, [mascara_limpiar]
-        pand xmm3, xmm8 ; xmm3 = | ceros | p2 + p5 + p8 |
-        paddw xmm0, xmm3 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
-        movdqu xmm3, xmm0 ; xmm3 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
-        psrldq xmm0, 8 ; xmm0 = | ceros | p1 + p4 + p7 |
-        paddw xmm0, xmm3 ; xmm0 = | ceros | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
+            ; hago la division por 9 de cada canal
+            movdqu xmm8, [division_9]
+            divps xmm0, xmm8 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
-        ; convierto a floats SP para hacer la division, tengo 4 canales de 32 bits
-        pxor xmm7, xmm7 ; xmm7 = ceros
-        punpcklwd xmm0, xmm7 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
-        cvtdq2ps xmm0, xmm0 ; xmm0 = | p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8 |
+            ; paso devuelta a enteros de 32 bits:
+            cvtps2dq xmm0, xmm0 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+            ; paso a enteros de 16 bits
+            pxor xmm7, xmm7 ; xmm7 = ceros
+            packssdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+            ; paso a enteros de 8 bits
+            packsswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
 
-        ; hago la division por 9 de cada canal
-        movdqu xmm8, [division_9]
-        divps xmm0, xmm8 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+            add rsi, PIXEL_SIZE ; incremento la columna en uno
+            sub rsi, r8 ; vuelvo a ubicar rsi en la fila del centro de la matriz
+            movd [rbx + rsi], xmm0 ; muevo el resultado al centro de la matriz
 
-        ; paso devuelta a enteros de 32 bits:
-        cvtps2dq xmm0, xmm0 ; xmm0 = | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
-        ; paso a enteros de 16 bits
-        pxor xmm7, xmm7 ; xmm7 = ceros
-        packssdw xmm0, xmm7 ; xmm0 = | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
-        ; paso a enteros de 8 bits
-        packsswb xmm0, xmm7 ; xmm0 = | basura | basura | basura | (p1 + p4 + p7 + p0 + p3 + p6 + p2 + p5 + p8) / 9 |
+            add rdx, 4 ; sumo al contador_columna la cantidad de bytes que procese en esta vuelta
+            cmp rdx, r9
+            jl .ciclo_columna
 
-        lea rdi, [rbx + rcx]  ;rdi es donde empieza la matriz de 3x3: (0,0)
-        movd [rdi + r12 + PIXEL_SIZE], xmm0 ; muevo el resultado al centro de la matriz
+            inc rcx	; Incremento el contador de filas
 
-        add rcx, PIXEL_SIZE
-        add r8, PIXEL_SIZE
-        jmp .ciclo
-    .ciclo_fin:
+            mov rax, r13
+            sub rax, 2
+			cmp rcx, rax; Me fijo si termine las filas
+			je .fin
+			jmp .ciclo_fila
+
+    .fin:
     mov rdi, r14
     call free
 
