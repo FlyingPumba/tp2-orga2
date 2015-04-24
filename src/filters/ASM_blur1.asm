@@ -54,8 +54,7 @@ ASM_blur1:
     .ciclo_vectores_inicial:
         cmp rdi, r8
         jge .procesar_fila
-        lea rsi, [rbx + rdi]
-        mov DWORD esi, [rsi + 1*r12] ; copio un pixel
+        mov DWORD esi, [rbx + rdi] ; copio un pixel de la primera fila
         mov [r15 + rdi], esi ; pego un pixel
         add rdi, PIXEL_SIZE
         jmp .ciclo_vectores_inicial
@@ -78,8 +77,7 @@ ASM_blur1:
             ; cargo el nuevo pixel correspondiente en el vector auxiliar de la fila mas alta
 
             lea rax, [rbx + rdi] ; rax apunta a donde empieza la fila actual
-            add rax, r8
-            add rax, r8 ; rax = rax + 2* (width * 4)
+            add rax, r8 ; rax = rax + width * 4
             mov DWORD esi, [rax + rdx]
             mov [r15 + rdx], esi
 
@@ -103,7 +101,7 @@ ASM_blur1:
             movdqu xmm2, [rbx + rsi] ; xmm2 = | basura | p8 | p7 | p6 |
 
             ; ahora convierto todos los canales de 1 byte a canales de 2 bytes, para realizar las sumas sin romper nada.
-            ; entonces, cada pixel va a pasar a medir 8 bytes (64bits)
+            ; entonces, cada pixel va a pasar a medir 8 bytes (64bits) en vez de 4 bytes
 
             pxor xmm7, xmm7 ; xmm7 = ceros
             movdqu xmm3, xmm0 ; xmm3 = xmm0
@@ -125,7 +123,7 @@ ASM_blur1:
             paddw xmm3, xmm4 ; xmm3 = | basura | p2 + p5 |
             paddw xmm3, xmm5 ; xmm3 = | basura | p2 + p5 + p8 |
 
-            ; limpio la basura en xmm3 para poder supar tranqui
+            ; limpio la basura en xmm3 para poder sumar tranqui
             movdqu xmm8, [mascara_limpiar]
             pand xmm3, xmm8 ; xmm3 = | ceros | p2 + p5 + p8 |
             paddw xmm0, xmm3 ; xmm0 = | p1 + p4 + p7 | p0 + p3 + p6 + p2 + p5 + p8 |
