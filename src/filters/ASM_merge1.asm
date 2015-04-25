@@ -29,10 +29,10 @@ ASM_merge1:
   ; xmm0 tiene un scalar float SP que es el value. xmm0 = | ceros .. value |
   ; lo convierto a 4 floats SP
   movdqu xmm1, xmm0 ; xmm1 = xmm0
-  shlldq xmm1, 4 ; xmm1 = | ceros .. value ceros (4 bytes) |
+  pslldq xmm1, 4 ; xmm1 = | ceros .. value ceros (4 bytes) |
   addps xmm0, xmm1 ; xmm0 = | ceros .. value value |
   movqu xmm1, xmm0 ; xmm1 = xmm0
-  shlldq xmm1, 8 ; xmm1 = | value value ceros .. |
+  pslldq xmm1, 8 ; xmm1 = | value value ceros .. |
   addps xmm0, xmm1 ; xmm0 = | value | value | value | value |
 
   ; preparo un vector en xmm15 que va a tener: | 1-value | 1-value | 1-value | 1-value |
@@ -139,9 +139,9 @@ ASM_merge1:
           packuswb xmm11, xmm14 ; xmm11 = | ceros | ceros | ceros | p1-3 * value + p2-3 * (1-value) | (enteros 8b)
 
           ; junto los 4 pixeles en xmm5
-          shlldq xmm7, 4 ; xmm7 = | ceros | ceros | p1-1 * value + p2-1 * (1-value) | ceros |
-          shlldq xmm9, 8 ; xmm9 = | ceros | p1-2 * value + p2-2 * (1-value) | ceros | ceros |
-          shlldq xmm11, 12 ; xmm11 = | p1-3 * value + p2-3 * (1-value) | ceros | ceros | ceros |
+          pslldq xmm7, 4 ; xmm7 = | ceros | ceros | p1-1 * value + p2-1 * (1-value) | ceros |
+          pslldq xmm9, 8 ; xmm9 = | ceros | p1-2 * value + p2-2 * (1-value) | ceros | ceros |
+          pslldq xmm11, 12 ; xmm11 = | p1-3 * value + p2-3 * (1-value) | ceros | ceros | ceros |
           por xmm5, xmm7 ; xmm5 = | ceros | ceros | p1-1 * value + p2-1 * (1-value) | p1-0 * value + p2-0 * (1-value) |
           por xmm9, xmm11 ; xmm9 = | p1-3 * value + p2-3 * (1-value) | p1-2 * value + p2-2 * (1-value) | ceros | ceros |
           por xmm5, xmm9 ; xmm5 = | p1-3 * value + p2-3 * (1-value) | p1-2 * value + p2-2 * (1-value) | p1-1 * value + p2-1 * (1-value) | p1-0 * value + p2-0 * (1-value) |
