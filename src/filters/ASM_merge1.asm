@@ -31,7 +31,7 @@ ASM_merge1:
   movdqu xmm1, xmm0 ; xmm1 = xmm0
   pslldq xmm1, 4 ; xmm1 = | ceros .. value ceros (4 bytes) |
   addps xmm0, xmm1 ; xmm0 = | ceros .. value value |
-  movqu xmm1, xmm0 ; xmm1 = xmm0
+  movdqu xmm1, xmm0 ; xmm1 = xmm0
   pslldq xmm1, 8 ; xmm1 = | value value ceros .. |
   addps xmm0, xmm1 ; xmm0 = | value | value | value | value |
 
