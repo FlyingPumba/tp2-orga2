@@ -53,3 +53,7 @@ Temporary Items
 *.swp
 *.swo
 *~
+src/tp2
+src/bmp/example
+src/tools/diff
+bin/diff
