@@ -65,7 +65,7 @@ ASM_blur2:
     .ciclo_fila:
         ; preparo rdi como registro auxiliar para levantar datos
         mov rax, r8
-        mul rcx
+        mul rcx ; rax = contador_filas * width * 4
         mov rdi, rax ; rdi = contador_filas * width * 4 (offset de fila actual)
 
         ; cargo los nuevos vectores auxiliares
@@ -130,7 +130,7 @@ ASM_blur2:
             paddw xmm6, xmm7
             paddw xmm6, xmm8 ; xmm6 = | p14 + p24 + p34 | p13 + p23 + p33 |
             paddw xmm9, xmm10
-            paddw xmm9, xmm11 ; xmm11 = | p16 + p26 + p36 | p15 + p25 + p35 |
+            paddw xmm9, xmm11 ; xmm9 = | p16 + p26 + p36 | p15 + p25 + p35 |
 
             ;separo cada columna en registros cuyos canales son de 32 bits
             movdqu xmm1, xmm0
@@ -139,9 +139,9 @@ ASM_blur2:
             movdqu xmm7, xmm6
             punpcklwd xmm6, xmm15 ; xmm6 = |p13 + p23 + p33| = col3
             punpckhwd xmm7, xmm15 ; xmm7 = |p14 + p24 + p34| = col4
-            movdqu xmm12, xmm11
-            punpcklwd xmm11, xmm15 ; xmm11 = |p15 + p25 + p35| = col5
-            punpckhwd xmm12, xmm15 ; xmm12 = |p16 + p26 + p36| = col6
+            movdqu xmm10, xmm9
+            punpcklwd xmm9, xmm15 ; xmm9 = |p15 + p25 + p35| = col5
+            punpckhwd xmm10, xmm15 ; xmm10 = |p16 + p26 + p36| = col6
 
             ;sumo las columnas correspondientes para luego convertirlas a float y dividir
             paddd xmm0, xmm1
@@ -149,9 +149,9 @@ ASM_blur2:
             paddd xmm1, xmm6
             paddd xmm1, xmm7 ; xmm1 = col2 + col3 + col4 = i2
             paddd xmm6, xmm7
-            paddd xmm6, xmm11 ; xmm6 = col3 + col4 + col5 = i3
-            paddd xmm7, xmm11
-            paddd xmm7, xmm12 ; xmm7 = col4 + col5 + col6 = i4
+            paddd xmm6, xmm9 ; xmm6 = col3 + col4 + col5 = i3
+            paddd xmm7, xmm9
+            paddd xmm7, xmm10 ; xmm7 = col4 + col5 + col6 = i4
 
             ; convierto a floats SP para hacer la division, tengo 4 canales de 32 bits
             cvtdq2ps xmm0, xmm0 ; xmm0 = floats(i1) = f1
