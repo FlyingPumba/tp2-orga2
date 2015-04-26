@@ -42,6 +42,9 @@ ASM_merge1:
   mov r8, r12
   shl r8, 2 ; r8 = width * 4 (ancho en bytes de la imagen)
 
+  mov r9, r8
+  sub r9, 8; r9 = width * 4 - 8 (ancho en bytes a recorrer)
+
   xor rcx, rcx ; contador de filas (en pixeles)
   .ciclo_fila:
       ; preparo rdi como registro auxiliar para levantar datos
@@ -56,8 +59,8 @@ ASM_merge1:
           ; vamos a cargar la mayor cantidad de pixeles que podamos, que en memoria se veria:
           ; data1 = | p1-0 | p1-1 | p1-2 | p1-3 | p1-4 | p1-5 | p1-6 | p1-7 |
           ; data2 = | p2-0 | p2-1 | p2-2 | p2-3 | p2-4 | p2-5 | p2-6 | p2-7 |
-          movdqu xmm1, [r14 + rdx] ; xmm1 = | p1-3 | p1-2 | p1-1 | p1-0 |
-          movdqu xmm2, [r15 + rdx] ; xmm2 = | p2-3 | p2-2 | p2-1 | p2-0 |
+          movdqu xmm1, [r14 + rsi] ; xmm1 = | p1-3 | p1-2 | p1-1 | p1-0 |
+          movdqu xmm2, [r15 + rsi] ; xmm2 = | p2-3 | p2-2 | p2-1 | p2-0 |
 
           ; ahora, convierto todos los canales de 1 byte a canales de 2 bytes
           ; entonces, cada pixel va a pasar a medir 8 bytes (64bits) en vez de 4 bytes
@@ -147,10 +150,10 @@ ASM_merge1:
           por xmm5, xmm9 ; xmm5 = | p1-3 * value + p2-3 * (1-value) | p1-2 * value + p2-2 * (1-value) | p1-1 * value + p2-1 * (1-value) | p1-0 * value + p2-0 * (1-value) |
 
           ; bajo a memoria en el mismo lugar donde levante los 4 pixeles de *data1
-          movdqu [r14 + rdx], xmm5
+          movdqu [r14 + rsi], xmm5
 
           add rdx, 16 ; incremento en 16 (4 pixeles * 4 bytes c/u) el contador_columna
-          cmp rdx, r8
+          cmp rdx, r9
           jl .ciclo_columna
 
       inc rcx	; Incremento el contador de filas
