@@ -56,4 +56,4 @@ Temporary Items
 src/tp2
 src/bmp/example
 src/tools/diff
-bin/diff
+bin/*
