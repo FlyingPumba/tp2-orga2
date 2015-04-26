@@ -47,9 +47,6 @@ ASM_blur2:
     mov r8, r12
     shl r8, 2 ; r8 = width * 4 (ancho en bytes de la imagen)
 
-    mov r9, r8
-    sub r9, 16; r9 = width * 4 - 8 (ancho en bytes a recorrer)
-
     ;copio la primera fila en [r15], para preservar la fila procesada en cada ciclo
     xor rdi, rdi
     .ciclo_vectores_inicial:
@@ -72,9 +69,9 @@ ASM_blur2:
         xor rdx, rdx ; contador de columnas (en bytes)
 
         ;pongo en [r14] los datos de la fila anterior, para eso, intercambio los punteros de r14 y r15
-        push r15
+        mov r9, r15
         mov r15, r14
-        pop r14
+        mov r14, r9
 
         ;pongo en [r15] los datos de la fila actual
         lea rax, [rbx + rdi] ; rax apunta a donde empieza la fila actual
@@ -195,11 +192,13 @@ ASM_blur2:
             add rsi, PIXEL_SIZE ; incremento la columna en uno
             sub rsi, r8 ; vuelvo a ubicar rsi en la fila actual de la matriz
 
-            movdqu [rbx + rsi], xmm0 ; muevo el resultado a la matriz
-
             lea rdx, [rdx + 4*PIXEL_SIZE] ; sumo al contador_columna la cantidad de bytes que procese en esta vuelta
-            cmp rdx, r9
-            jl .ciclo_columna
+            cmp rdx, r8
+            jge .ultimas_columnas
+            movdqu [rbx + rsi], xmm0 ; muevo | pixel4 | pixel3 | pixel2 | pixel1 | a la matriz
+            jmp .ciclo_columna
+            .ultimas_columnas
+            movq [rbx + rsi], xmm0 ; muevo | pixel2 | pixel1 | a la matriz
 
             inc rcx	; Incremento el contador de filas
 
