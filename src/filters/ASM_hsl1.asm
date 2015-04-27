@@ -35,6 +35,7 @@ section .data
 
 hsl_temp_dato: dd 0.0, 0.0, 0.0, 0.0
 hsl_suma_dato: dd 0.0, 0.0, 0.0, 0.0
+hsl_params_dato: dd 0.0, 0.0, 0.0, 0.0
 
 rgb_result: db 0, 0, 0, 0
 
@@ -59,6 +60,7 @@ ASM_hsl1:
 	por xmm4, xmm0
 	por xmm4, xmm1
 	por xmm4, xmm2 ; xmm4 = |LL|SS|HH|0.0|
+	movdqu [hsl_params_dato], xmm4 ; [hsl_suma_dato] = |0.0|HH|SS|LL|
 
 	mov rax, rdi ; rax = w
 	mul rsi ; rax = w * h
@@ -71,9 +73,6 @@ ASM_hsl1:
 		cmp rbx, r15
 		jg .fin
 
-		; consigo los parametros originales de la funcion
-		movdqu [hsl_suma_dato], xmm4 ; [hsl_suma_dato] = |0.0|HH|SS|LL|
-
 		; paso el pixel actual a HSL
 		mov rdi, rbx ; rdi = *(pixel_actual)
 		mov rsi, hsl_temp_dato ; rsi = (address_hsl)
@@ -81,7 +80,7 @@ ASM_hsl1:
 
 		; preparo los datos de la suma
 		movdqu xmm0, [hsl_temp_dato] ; xmm0 = |l|s|h|a|
-		movdqu xmm1, [hsl_suma_dato] ; xmm1 = |LL|SS|HH|0.0|
+		movdqu xmm1, [hsl_params_dato] ; xmm1 = |LL|SS|HH|0.0|
 
 		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
