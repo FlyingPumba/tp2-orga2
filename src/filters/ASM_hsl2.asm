@@ -7,6 +7,7 @@
 
 ; void ASM_hsl2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
 global ASM_hsl2
+extern hslTOrgb
 %define RGB_PIXEL_SIZE     	4
 %define RGB_OFFSET_ALPHA 	0
 %define RGB_OFFSET_RED      1
@@ -26,21 +27,31 @@ section .rodata
 hsl_max_dato: dd 1.0, 360.0, 1.0, 1.0 ; |max_a|max_h|max_s|max_l|
 hsl_min_dato: dd 0.0, 0.0, 0.0, 0.0 ; |0.0|0.0|0.0|0.0|
 hsl_fix_dato: dd 0.0, 360.0, 0.0, 0.0 ; |0.0|360.0|0.0|0.0|
-hsl_first_dword_mask: dd 0xffffffff, 0, 0, 0 ; |1..1|0|0|0|
-hsl_second_dword_mask: dd 0, 0xffffffff, 0, 0 ; |1..1|0|0|0|
-fabs_mask: dd 0.0, 0.0, 0.0, 0x7fffffff
 
-zero_fdword: dd 0.0, 0.0, 0.0, 0.0 ; |0|0|0|0|
-l_divisor_fdword: dd 1.0, 510.0, 1.0, 1.0 ; |510.0|1.0|1.0|1.0|
-l_mul2_fdword: dd 1.0, 1.0, 1.0, 2.0 ; |1.0|1.0|1.0|2.0|
-l_subfirst_fdword: dd 0.0, 0.0, 0.0, 1.0 ; |0.0|0.0|0.0|1.0|
-l_addhead: dd 1.0, 1.0, 1.0, 0.0 ; |1.0|1.0|1.0|0.0|
-l_div_255: dd 1.0, 1.0, 1.0, 255.0001
+hsl_second_dword_mask: dd 0, 0xffffffff, 0, 0 ; |1..1|0|0|0|
+hsl_second_dword_one: dd 0.0, 1.0, 0.0, 0.0 ; |1..1|0|0|0|
+hsl_l_divisor: dd 1.0, 510.0, 1.0, 1.0 ; |1.0|510.0|1.0|1.0|
+hsl_s_divisor: dd 1.0, 255.0001, 1.0, 1.0 ; |1.0|255.001|1.0|1.0|
+hsl_fabs_mask: dd 0.0, 0x7fffffff, 0.0, 0.0
+hsl_second_dword_zero: dd 1.0, 0.0, 1.0, 1.0
+hsl_sub_order: db 0, 3, 1, 2
+hsl_sixty_mask: dd 60.0, 60.0, 60.0, 60.0
+hsl_h_add_mask: dd 0.0, 4.0, 6.0, 2.0
+
+;zero_fdword: dd 0.0, 0.0, 0.0, 0.0 ; |0|0|0|0|
+;l_nonzero_div: dd 0xffffffff, 0.0, 0xffffffff, 0xffffffff ; |1..1|0.,0|1..1|1..1|
+;l_mul2_fdword: dd 1.0, 1.0, 1.0, 2.0 ; |1.0|1.0|1.0|2.0|
+;l_subfirst_fdword: dd 0.0, 0.0, 0.0, 1.0 ; |0.0|0.0|0.0|1.0|
+;l_addhead: dd 1.0, 1.0, 1.0, 0.0 ; |1.0|1.0|1.0|0.0|
+;l_div_255: dd 1.0, 1.0, 1.0, 255.0001
+;l_mul_60: dd 0.0, 60.0, 0.0, 0.0
+;h_cmp_val: dd 0.0, 360.0, 0.0, 0.0
 
 section .data
 
 hsl_temp_dato: dd 0.0, 0.0, 0.0, 0.0
 hsl_suma_dato: dd 0.0, 0.0, 0.0, 0.0
+hsl_params_dato: dd 0.0, 0.0, 0.0, 0.0
 
 rgb_result: db 0, 0, 0, 0
 
@@ -50,8 +61,6 @@ ASM_hsl2:
 	;stack frame
 	push rbp
 	mov rbp, rsp
-	push r12
-	push r13
 	push r14
 	push r15
 	push rbx
@@ -60,16 +69,16 @@ ASM_hsl2:
 
 	mov rbx, rdx ; rbx = *data (aumenta en cada ciclo)
 
-	pxor xmm3, xmm3 ; xmm3 |0.0|0.0|0.0|0.0|
+	pxor xmm4, xmm4 ; xmm4 |0.0|0.0|0.0|0.0|
 	pslldq xmm0, 4 ; xmm0 |0.0|0.0|HH|0.0|
 	pslldq xmm1, 8 ; xmm1 |0.0|SS|0.0|0.0|
 	pslldq xmm2, 12 ; xmm2 |LL|0.0|0.0|0.0|
-	por xmm3, xmm0
-	por xmm3, xmm1
-	por xmm3, xmm2 ; xmm3 = |LL|SS|HH|0.0|
-	movdqu [hsl_suma_dato], xmm3 ; [hsl_suma_dato] = |0.0|HH|SS|LL|
+	por xmm4, xmm0
+	por xmm4, xmm1
+	por xmm4, xmm2 ; xmm4 = |LL|SS|HH|0.0|
+	movdqu [hsl_params_dato], xmm4 ; [hsl_suma_dato] = |0.0|HH|SS|LL|
 
-	mov rax, uuurdi ; rax = w
+	mov rax, rdi ; rax = w
 	mul rsi ; rax = w * h
 	mov rsi, RGB_PIXEL_SIZE ; rsi = RGB_PIXEL_SIZE
 	mul rsi ; rax = w * h * RGB_PIXEL_SIZE = *data.size()
@@ -85,15 +94,19 @@ ASM_hsl2:
 		mov rsi, hsl_temp_dato ; rsi = (address_hsl)
 		call rgbTOhsl ; [hsl_temp_dato] = |a|h|s|l|
 
+		; preparo los datos de la suma
 		movdqu xmm0, [hsl_temp_dato] ; xmm0 = |l|s|h|a|
-		movdqu xmm1, [hsl_suma_dato] ; xmm1 = |LL|SS|HH|0.0|
+		movdqu xmm1, [hsl_params_dato] ; xmm1 = |LL|SS|HH|0.0|
 
+		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
 		movdqu xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (float)
 
+		; pongo la respuesta en [hsl_suma_dato], aca voy a mantener el dato respuesta
 		movdqu [hsl_suma_dato], xmm0 ; [hsl_suma_dato] = |a|h+HH|s+SS|l+LL| (float)
 
-		movdqu xmm3, [hsl_fix_dato]
+		; uso xmm3 para comparar y fixear el HUE resultante
+		movdqu xmm3, [hsl_fix_dato] ; xmm0 = |0.0|0.0|360.0|0.0| (float)
 
 		.check_max:
 
@@ -108,17 +121,15 @@ ASM_hsl2:
 			.check_max_hue:
 			cmp edi, FALSE
 			jne .check_max_sat ; if ( (h < max_h) == false )
-			movdqu xmm0, xmm2
-			subps xmm0, xmm3
-			movdqu [hsl_temp_dato], xmm0
-			mov dword r12d, [hsl_temp_dato+HSL_OFFSET_HUE]
-			mov dword [hsl_suma_dato+HSL_OFFSET_HUE], r12d ; h = h - 360
+			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
+			subps xmm0, xmm3 ; xmm0 = |l+LL|s+SS|h+HH-360|a| (float)
+			movdqu [hsl_suma_dato], xmm0 ; [hsl_suma_dato] = |a|h+HH-360|s+SS|l+LL|
 
 			.check_max_sat:
 			cmp esi, FALSE
 			jne .check_max_lum ; if ( (s < max_s) == false )
-			mov dword r13d, [hsl_max_dato+HSL_OFFSET_SAT]
-			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r13d ; s = max_s
+			mov dword r14d, [hsl_max_dato+HSL_OFFSET_SAT]
+			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r14d ; s = max_s
 
 			.check_max_lum:
 			cmp edx, FALSE
@@ -130,7 +141,7 @@ ASM_hsl2:
 
 			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
 			movdqu xmm1, [hsl_min_dato]
-			cmpnltps xmm0, xmm1 ; xmm0 = |l > 0.0|s > 0.0|h > 0.0|a > 0.0| (bool)
+			cmpnltps xmm0, xmm1 ; xmm0 = |l >= 0.0|s >= 0.0|h >= 0.0|a >= 0.0| (bool)
 			movdqu [hsl_temp_dato], xmm0 ; [hsl_temp_dato] = |a > 0.0|h > 0.0|s > 0.0|l > 0.0| (bool)
 
 			mov dword edi, [hsl_temp_dato+HSL_OFFSET_HUE] ; edi = h >= 0.0
@@ -140,17 +151,17 @@ ASM_hsl2:
 			.check_min_hue:
 			cmp edi, FALSE
 			jne .check_min_sat ; if ( (h >= min_h) == false )
-			movdqu xmm0, xmm2
-			addps xmm0, xmm3
-			movdqu [hsl_temp_dato], xmm0
-			mov dword r12d, [hsl_temp_dato+HSL_OFFSET_HUE]
-			mov dword [hsl_suma_dato+HSL_OFFSET_HUE], r12d ; h = h + 360
+			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
+			addps xmm0, xmm3 ; xmm0 = |l+LL|s+SS|h+HH+360|a| (float)
+			movdqu [hsl_temp_dato], xmm0 ; [hsl_temp_dato] = |a|h+HH+360|s+SS|l+LL|
+			mov dword r14d, [hsl_temp_dato+HSL_OFFSET_HUE] ; r14d = h+HH+360
+			mov dword [hsl_suma_dato+HSL_OFFSET_HUE], r14d ; h+HH+360 ; obs: no puedo sobreescribir todo
 
 			.check_min_sat:
 			cmp esi, FALSE
 			jne .check_min_lum ; if ( (s >= min_s) == false )
-			mov dword r13d, [hsl_min_dato+HSL_OFFSET_SAT]
-			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r13d ; s = min_s
+			mov dword r14d, [hsl_min_dato+HSL_OFFSET_SAT]
+			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r14d ; s = min_s
 
 			.check_min_lum:
 			cmp edx, FALSE
@@ -179,21 +190,19 @@ ASM_hsl2:
 	pop rbx
 	pop r15
 	pop r14
-	pop r13
-	pop r12
 	pop rbp
 	ret
 
-
-
 rgbTOhsl:
-    pxor xmm6, xmm6 ; limpio xmm6
-    movdqu xmm4, [rdi] ; guardo en xmm4 el contenido del pixel (y sus vecinos)
+    ; el resultado parcial se guarda en xmm8
+    pxor xmm8, xmm8
 
+    ; calculo cmax, cmin y d
+    movdqu xmm4, [rdi] ; guardo en xmm4 el contenido del pixel (y sus vecinos)
     ; desempaqueto convierto las componentes del pixel a int de 32 bits
+    pxor xmm6, xmm6 ; limpio xmm6
     punpckhbw xmm4, xmm6
     punpckhwd xmm4, xmm6 ; xmm4 = ints(p)
-    movdqu xmm9, xmm4 ; xmm9 = xmm4
 
     movdqu xmm5, xmm4 ; xmm5 = xmm4
     movdqu xmm6, xmm6 ; xmm6 = xmm4
@@ -204,81 +213,91 @@ rgbTOhsl:
     pslldq xmm4, 4 ; xmm4 = | G | B | 0 | 0 |
     maxps xmm5, xmm4 ; xmm5 = | - | max(R,G,B) | - | - |
     minps xmm6, xmm4 ; xmm6 = | - | min(R,G,B) | - | - |
-
-    movdqu xmm8, xmm5 ; xmm8 = xmm5
-
-    ; calculo l
-    movdqu xmm7, xmm5 ; xmm7 = xmm5
-    paddd xmm7, xmm6 ; xmm7 = | - | max + min | - | -|
-    cvtdq2ps xmm7, xmm7 ; xmm7 = | - | float(max + min) | - | - |
-    movdqu xmm6, xmm7 ; xmm6 = xmm7
- 
-    divpx xmm7, [l_divisor_fdword] ; xmm7 = | - | l | - | - |
-    andps xmm7, [hsl_second_dword_mask] ; xmm7 = | 0.0 | l | 0.0 | 0.0 | 
-    pslldq xmm7, 8 ; xmm7 = | 0 | 0 | 0 | l |
+    movdqu xmm4, xmm5
+    psubd xmm4, xmm6
     
-    psubd xmm5, xmm6 ; xmm5 = | - | max(R,G,B) - min(R,G,B) | - | - |
-    ; convierto a la dif entre max y min a float
-    cvtdq2ps xmm5, xmm5 ; xmm5 = | - | float(max - min) | - | - |
+    movdqu xmm7, [hsl_second_dword_mask]
+    andps xmm4, xmm7 ; limpio d
+    andps xmm5, xmm7 ; limpio cmax
+    andps xmm6, xmm7 ; limpio cmin
 
-    andps xmm5, [hsl_second_dword_mask] ; xmm5 = | 0.0 | float(max - min) | 0.0 | 0.0 |
-    cmpps xmm5, zero_fdword
-    jne .rgbTOhsl_not_zero
+    ; xmm4 = d = max(R,G,B) - min(R,G,B)
+    ; xmm5 = cmax = max(R,G,B)
+    ; xmm6 = cmin = min(R,G,B)
 
-    ; cmax == cmin so we have the three components
-    cvtdq2ps xmm9, xmm9 ; xmm9 = floats(p)
-    andps xmm9, [hsl_first_dword_mask] ; xmm9 = | A | 0 | 0 | 0 |
+    ; calculo L
+    movdqu xmm9, xmm5
+    paddd xmm9, xmm6 ; xmm7 = | - | max + min | - | - |
+    andps xmm9, xmm7 ; xmm7 = | 0 | max + min | 0 | 0 |
+    cvtdq2ps xmm9, xmm9 ; xmm7 = | 0 | float(max + min) | 0 | 0 |
+    movdqu xmm7, [hsl_l_divisor]
+    divps xmm9, xmm7 ; xmm9 = | 0 | L | 0 | 0 |
+    psrldq xmm9, 8
+    paddd xmm8, xmm9 ; agrego a xmm8 la componente de L
 
-    paddd xmm9, xmm7 ; xmm4 = | A | 0.0 | 0.0 | L |
-    movdqu [rsi], xmm9 ; dst = xmm9
+    ; calculo S
+    movdqu xmm7, xmm4
+    psrldq xmm7, 8
+    movdqu xmm10, [hsl_second_dword_one]
+    psrldq xmm10, 8
+    ucomiss xmm7, xmm10
+    je .rgbTOhsl_calc_h ; si cmax == cmin dejo s en 0
 
-    jmp .rgbTOhsl_fin
+    pslldq xmm9, 8 ; vuelvo a posicionar L en la segunda posición | 0 | L | 0 | 0 |
+    movdqu xmm7, [hsl_second_dword_one]
+    paddd xmm7, xmm7
+    mulps xmm9, xmm7 ; xmm9 = | 0 | 2L | 0 | 0 |
+    psubd xmm7, xmm7
+    psubd xmm9, xmm7 ; xmm9 = | 0 | 2L - 1 | 0 | 0 |
+    andps xmm9, [hsl_fabs_mask] ; xmm9 = | 0 | fabs(2L - 1) | 0 | 0 |
+    psubd xmm7, xmm9 ; xmm7 = | 0 | 1 - fabs(2L - 1) | 0 | 0 |
+    movdqu xmm9, [hsl_second_dword_zero] ; para no dividir por 0
+    paddd xmm7, xmm9 ; xmm7 = | 1 | 1 - fabs(2L -1) | 1 | 1 | 
+    movdqu xmm9, xmm4
+    divps xmm9, xmm7 ; xmm9 = | 0 | d/(1 - fabs(2L -1)) | 0 | 0 |
+    movdqu xmm7, [hsl_s_divisor]
+    divps xmm9, xmm7 ; xmm9 = | 0 | d/(1 - fabs(2L -1))/255.0001 | 0 | 0 |
 
-    .rgbTOhsl_not_zero:
-        ; ya puedo calcular s
-        movdqu xmm4, xmm7 ; xmm4 = xmm7 = | 0 | 0 | 0 | l |
-        mulps xmm4, [l_mul2_fdword] ; xmm4 = | 0 | 0 | 0 | l * 2.0 |
-        psubd xmm4, [l_subfirst_fdword] ; xmm4 = | 0 | 0 | 0 | l * 2.0 - 1.0f |
+    psrldq xmm9, 4 ; xmm9 = | 0 | 0 | S | 0 |
+    paddd xmm8, xmm9
+    
+    .rgbTOhsl_calc_h:
+    ; calculo h
+    movdqu xmm7, xmm4
+    psrldq xmm7, 8
+    movdqu xmm10, [hsl_second_dword_one]
+    psrldq xmm10, 8
+    ucomiss xmm7, xmm10
+    je .rgbTOhsl_fin ; si cmax == cmin dejo h en 0
 
-        andps xmm4, [fabs_mask] ; xmm4 = | 0 | 0 | 0 | fabs(l*2.0 - 1.0f) |
-        movdqu xmm6, [l_subfirst_fdword] ; xmm6 = | 0 | 0 | 0 | 1.0 |
-        psubd xmm6, xmm4 ; xmm6 = | 0 | 0 | 0 | 1.0 - fabs(l * 2.0 - 1.0f) |
-        paddd xmm6, [l_addhead] ; xmm6 = | 1.0 | 1.0 | 1.0 | 1.0 - fabs(l * 2.0 - 1.0f) |
-        psrldq xmm5, 8 ; xmm5 = | 0 | 0 | 0 | cmax - cmin |
-        divps xmm5, xmm6 ; xmm5 = | 0 | 0 | 0 | d / 1.0 - fabs(l * 2.0 - 1.0f) |
-        divps xmm5, [l_div_255] ; xmm5 = | 0 | 0 | 0 | d / 1.0 - fabs(l * 2.0 - 1.0f) / 255.0001 |
-        
-        pslldq xmm5, 8
-        andps xmm5, [hsl_second_dword_mask] ; xmm7 = | 0.0 | s | 0.0 | 0.0 | 
-        psrldq xmm5, 4
-        paddd xmm7, xmm5 ; xmm7 = | 0.0 | 0.0 | s | l |
+    ; ordeno los datos
+    movdqu xmm7, [rdi]
+    pxor xmm9, xmm9 ; limpio xmm9
+    punpckhbw xmm7, xmm9
+    punpckhwd xmm7, xmm9 ; xmm7 = ints(p)
+    
+    mov al, [hsl_sub_order]
+    pshufd xmm9, xmm7, al
 
-        ; calculo h
-        andps xmm8, [hsl_second_dword_mask] ; xmm5 = | 0 | max(R,G,B) | 0 | 0 |
-        movdqu xmm10, xmm9; xmm10 = ints(p)
-        andps xmm10, [hsl_second_dword_mask] ; xmm10 = | 0 | R | 0 | 0 |
-        cmpps xmm8, xmm10
-        jne .rgbTOhsl_test_g
+    psubd xmm7, xmm9 ; | 0 | r-g | g-b | b-r |
+    cvtdq2ps xmm7, xmm7 ; xmm7 = floats(r-g,g-b,b-r)
+    cvtdq2ps xmm4, xmm4 ; xmm4 = floats(xmm4)
 
+    divps xmm7, xmm4 ; xmm7 = | 0 | r-g/d | g-b/d | b-r/d |
+    movdqu xmm10, [hsl_h_add_mask]
+    paddd xmm7, xmm10 ; xmm7 = | 0 | r-g/d + 4 | g-b/d + 6 | b-r/d + 2 |
 
+    .rgbTOhsl_max_r:
+    movdqu xmm11, xmm9 ; xmm11 = ints(p)
+    andps xmm11, xmm7 ; xmm11 == R
+    cmp xmm11, xmm9
+    jne .rgbTOhsl_max_g
+    
+    ;.rgbTOhsl_max_g:
 
-        .rgbTOhsl_test_g:
-        movdqu xmm10, xmm9
-        psrldq xmm10, 4 
-        andps xmm10, [hsl_second_dword_mask] ; xmm10 = | 0 | G | 0 | 0 |
-        cmpps xmm8, xmm10
-        jne .rgbTOhsl_test_b
-
-        .rgbTOhsl_test_b:
-        movdqu xmm10, xmm9
-        psrldq xmm10, 4 
-        andps xmm10, [hsl_second_dword_mask] ; xmm10 = | 0 | B | 0 | 0 |
-         
-        ;divps xmm5, 
-    ;s = d/(1.0f-fabs(2.0f*l-1.0f))/255.0001f;
-
-        .rgbTOhsl_non_zero_fin:
-            
+    ;.rgbTOhsl_max_b:
 
     .rgbTOhsl_fin:
+    movdqu [rsi], xmm8
+
     ret
