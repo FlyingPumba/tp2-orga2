@@ -8,7 +8,7 @@
 ; void ASM_merge2(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value)
 global ASM_merge2
 section .rodata
-    unos: dd 1.0, 1.0, 1.0, 1.0
+    uno: dd 1.0
 
 section .text
 ASM_merge2:
@@ -27,17 +27,61 @@ ASM_merge2:
   mov r15, rcx ; r15 <- *data2
 
   ; xmm0 tiene un scalar float SP que es el value. xmm0 = | ceros .. value |
-  ; lo convierto a 4 floats SP
-  movdqu xmm1, xmm0 ; xmm1 = xmm0
-  pslldq xmm1, 4 ; xmm1 = | ceros .. value ceros (4 bytes) |
-  addps xmm0, xmm1 ; xmm0 = | ceros .. value value |
-  movdqu xmm1, xmm0 ; xmm1 = xmm0
-  pslldq xmm1, 8 ; xmm1 = | value value ceros .. |
-  addps xmm0, xmm1 ; xmm0 = | value | value | value | value |
+  movdqu xmm2, xmm0
+  ; calculo 1-value
+  movd xmm1, [uno]
+  subss xmm1, xmm0 ; xmm1 = 1-value
+  movd edi, xmm0 ; edi = | signo (1bit) | exponente (8bit) | mantisa (23bit) |
+  movd esi, xmm1
 
-  ; preparo un vector en xmm15 que va a tener: | 1-value | 1-value | 1-value | 1-value |
-  movdqu xmm15, [unos] ; xmm15 = | 1 1 1 1 | (en floats SP)
-  subps xmm15, xmm0 ; xmm15 = | 1-value | 1-value | 1-value | 1-value |
+  ; extraigo de value el valor del exponente
+  shl edi, 1 ; shifteo a la izquierda 1 bit. edi = | exponente (8bit) | mantisa (23bit) | 0 (1bit) |
+  shr edi, 24 ; shifteo a la derecha 24 bits. edi = | ceros (24bit) | exponente (8bit) |
+
+  ; extraigo de 1-value el valor del exponente
+  shl esi, 1 ; shifteo a la izquierda 1 bit. esi = | exponente (8bit) | mantisa (23bit) | 0 (1bit) |
+  shr esi, 24 ; shifteo a la derecha 24 bits. esi = | ceros (24bit) | exponente (8bit) |
+
+  ; me fijo cual es el menor de ambos.
+  ; Este es el k que voy a usar para pasar a enteros los valores de value y 1-value
+  cmp edi, esi
+  jle .value_menor_exp
+  ; le resto el exponente a 127 para obtener el k. Se que va a dar positivo por que 0<= value <= º
+  mov rax, 127
+  sub eax, esi
+  jmp .computar_values_enteros
+  .value_menor_exp:
+  mov rax, 127
+  sub eax, edi
+  .computar_values_enteros:
+  mov rbx, 1
+  mov cl, al
+  movd xmm12, eax ; xmm12 = k
+  shl rbx, cl ; rbx = 2^k
+  cvtsi2ss xmm3, rbx ; rbx = 2^k (float SP)
+  mulss xmm2, xmm3 ; xmm2 = value * 2^k
+  cvtss2si rdi, xmm2
+
+  ; los conviertos a 4 enteros 32b
+  movq xmm0, rdi ; xmm0 = value*2^k
+  movdqu xmm1, xmm0 ; xmm1 = xmm0
+  pslldq xmm1, 4 ; xmm1 = | ceros .. value*2^k ceros (4 bytes) |
+  addps xmm0, xmm1 ; xmm0 = | ceros .. value*2^k value*2^k |
+  movdqu xmm1, xmm0 ; xmm1 = xmm0
+  pslldq xmm1, 8 ; xmm1 = | value*2^k value*2^k ceros .. |
+  addps xmm0, xmm1 ; xmm0 = | value*2^k | value*2^k | value*2^k | value*2^k |
+
+  movq xmm13, rbx ; xmm13 = 2^k
+  movdqu xmm2, xmm13 ; xmm2 = xmm13
+  pslldq xmm2, 4 ; xmm2 = | ceros .. 2^k ceros (4 bytes) |
+  addps xmm13, xmm2 ; xmm13 = | ceros .. 2^k 2^k |
+  movdqu xmm2, xmm13 ; xmm2 = xmm13
+  pslldq xmm2, 8 ; xmm2 = | 2^k 2^k ceros .. |
+  addps xmm13, xmm2 ; xmm13 = | 2^k | 2^k | 2^k | 2^k |
+
+  ; preparo un registro con (1-value)*2^k
+  movdqu xmm15, xmm13
+  subpd xmm15, xmm0 ; xmm15 = | (1-value)*2^k | (1-value)*2^k | (1-value)*2^k | (1-value)*2^k |
 
   mov r8, r12
   shl r8, 2 ; r8 = width * 4 (ancho en bytes de la imagen)
@@ -75,59 +119,49 @@ ASM_merge2:
           punpckhbw xmm4, xmm14 ; xmm4 = | p2-3 | p2-2 |
 
           ; calculo primer pixel
-          ; paso los canales de 2 bytes enteros a canales de 4 bytes floats SP
+          ; paso los canales de 2 bytes enteros a canales de 4 bytes enteros
           movdqu xmm5, xmm1
           punpcklwd xmm5, xmm14 ; xmm5 = | p1-0 |
-          cvtdq2ps xmm5, xmm5 ; xmm5 = | p1-0 | (float)
           movdqu xmm6, xmm2
           punpcklwd xmm6, xmm14 ; xmm6 = | p2-0 |
-          cvtdq2ps xmm6, xmm6 ; xmm6 = | p2-0 | (float)
 
-          mulps xmm5, xmm0 ; xmm5 = | p1-0 * value |
-          mulps xmm6, xmm15 ; xmm6 = | p2-0 * (1-value) |
-          addps xmm5, xmm6 ; xmm5 = | p1-0 * value + p2-0 * (1-value) |
+          pmulld xmm5, xmm0 ; xmm5 = | p1-0 * value |
+          pmulld xmm6, xmm15 ; xmm6 = | p2-0 * (1-value) |
+          paddd xmm5, xmm6 ; xmm5 = | p1-0 * value + p2-0 * (1-value) |
+          psrld xmm5, xmm12 ; xmm5 = | (p1-0 * value * 2^k + p2-0 * (1-value) * 2^k) / 2^k |
 
           ; calculo segundo pixel (idem primero)
           movdqu xmm7, xmm1
           punpckhwd xmm7, xmm14 ; xmm7 = | p1-1 |
-          cvtdq2ps xmm7, xmm7 ; xmm7 = | p1-1 | (float)
           movdqu xmm8, xmm2
           punpckhwd xmm8, xmm14 ; xmm8 = | p2-1 |
-          cvtdq2ps xmm8, xmm8 ; xmm8 = | p2-1 | (float)
 
-          mulps xmm7, xmm0 ; xmm7 = | p1-1 * value |
-          mulps xmm8, xmm15 ; xmm8 = | p2-1 * (1-value) |
-          addps xmm7, xmm8 ; xmm7 = | p1-1 * value + p2-1 * (1-value) |
+          pmulld xmm7, xmm0 ; xmm7 = | p1-1 * value |
+          pmulld xmm8, xmm15 ; xmm8 = | p2-1 * (1-value) |
+          paddd xmm7, xmm8 ; xmm7 = | p1-1 * value + p2-1 * (1-value) |
+          psrld xmm7, xmm12 ; xmm7 = | (p1-1 * value * 2^k + p2-1 * (1-value) * 2^k) / 2^k |
 
           ; calculo tercer pixel (idem primero)
           movdqu xmm9, xmm3
           punpcklwd xmm9, xmm14 ; xmm9 = | p1-2 |
-          cvtdq2ps xmm9, xmm9 ; xmm9 = | p1-2 | (float)
           movdqu xmm10, xmm4
           punpcklwd xmm10, xmm14 ; xmm10 = | p2-2 |
-          cvtdq2ps xmm10, xmm10 ; xmm10 = | p2-2 | (float)
 
-          mulps xmm9, xmm0 ; xmm9 = | p1-2 * value |
-          mulps xmm10, xmm15 ; xmm10 = | p2-2 * (1-value) |
-          addps xmm9, xmm10 ; xmm9 = | p1-2 * value + p2-0 * (1-value) |
+          pmulld xmm9, xmm0 ; xmm9 = | p1-2 * value |
+          pmulld xmm10, xmm15 ; xmm10 = | p2-2 * (1-value) |
+          paddd xmm9, xmm10 ; xmm9 = | p1-2 * value + p2-0 * (1-value) |
+          psrld xmm9, xmm12 ; xmm9 = | (p1-2 * value * 2^k + p2-2 * (1-value) * 2^k) / 2^k |
 
           ; calculo cuarto pixel (idem primero)
           movdqu xmm11, xmm3
           punpckhwd xmm11, xmm14 ; xmm11 = | p1-3 |
-          cvtdq2ps xmm11, xmm11 ; xmm11 = | p1-3 | (float)
           movdqu xmm12, xmm4
           punpckhwd xmm12, xmm14 ; xmm12 = | p2-3 |
-          cvtdq2ps xmm12, xmm12 ; xmm12 = | p2-3 | (float)
 
-          mulps xmm11, xmm0 ; xmm11 = | p1-3 * value |
-          mulps xmm12, xmm15 ; xmm12 = | p2-3 * (1-value) |
-          addps xmm11, xmm12 ; xmm11 = | p1-3 * value + p2-3 * (1-value) |
-
-          ; transformo todos los resultados de floats SP a enteros 32 bits
-          cvtps2dq xmm5, xmm5 ; xmm5 = | p1-0 * value + p2-0 * (1-value) | (enteros 32b)
-          cvtps2dq xmm7, xmm7 ; xmm7 = | p1-1 * value + p2-1 * (1-value) | (enteros 32b)
-          cvtps2dq xmm9, xmm9 ; xmm9 = | p1-2 * value + p2-2 * (1-value) | (enteros 32b)
-          cvtps2dq xmm11, xmm11 ; xmm11 = | p1-3 * value + p2-3 * (1-value) | (enteros 32b)
+          pmulld xmm11, xmm0 ; xmm11 = | p1-3 * value |
+          pmulld xmm12, xmm15 ; xmm12 = | p2-3 * (1-value) |
+          paddd xmm11, xmm12 ; xmm11 = | p1-3 * value + p2-3 * (1-value) |
+          psrld xmm11, xmm12 ; xmm11 = | (p1-3 * value * 2^k + p2-3 * (1-value) * 2^k) / 2^k |
 
           ; transformo todos los resultados de enteros 32 bits a enteros 16 bits
           packusdw xmm5, xmm14 ; xmm5 = | ceros | p1-0 * value + p2-0 * (1-value) | (enteros 16b)
