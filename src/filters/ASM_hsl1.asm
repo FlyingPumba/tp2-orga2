@@ -44,8 +44,6 @@ ASM_hsl1:
 	;stack frame
 	push rbp
 	mov rbp, rsp
-	push r12
-	push r13
 	push r14
 	push r15
 	push rbx
@@ -54,14 +52,13 @@ ASM_hsl1:
 
 	mov rbx, rdx ; rbx = *data (aumenta en cada ciclo)
 
-	pxor xmm3, xmm3 ; xmm3 |0.0|0.0|0.0|0.0|
+	pxor xmm4, xmm4 ; xmm4 |0.0|0.0|0.0|0.0|
 	pslldq xmm0, 4 ; xmm0 |0.0|0.0|HH|0.0|
 	pslldq xmm1, 8 ; xmm1 |0.0|SS|0.0|0.0|
 	pslldq xmm2, 12 ; xmm2 |LL|0.0|0.0|0.0|
-	por xmm3, xmm0
-	por xmm3, xmm1
-	por xmm3, xmm2 ; xmm3 = |LL|SS|HH|0.0|
-	movdqu [hsl_suma_dato], xmm3 ; [hsl_suma_dato] = |0.0|HH|SS|LL|
+	por xmm4, xmm0
+	por xmm4, xmm1
+	por xmm4, xmm2 ; xmm4 = |LL|SS|HH|0.0|
 
 	mov rax, rdi ; rax = w
 	mul rsi ; rax = w * h
@@ -74,20 +71,27 @@ ASM_hsl1:
 		cmp rbx, r15
 		jg .fin
 
+		; consigo los parametros originales de la funcion
+		movdqu [hsl_suma_dato], xmm4 ; [hsl_suma_dato] = |0.0|HH|SS|LL|
+
 		; paso el pixel actual a HSL
 		mov rdi, rbx ; rdi = *(pixel_actual)
 		mov rsi, hsl_temp_dato ; rsi = (address_hsl)
 		call rgbTOhsl ; [hsl_temp_dato] = |a|h|s|l|
 
+		; preparo los datos de la suma
 		movdqu xmm0, [hsl_temp_dato] ; xmm0 = |l|s|h|a|
 		movdqu xmm1, [hsl_suma_dato] ; xmm1 = |LL|SS|HH|0.0|
 
+		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
 		movdqu xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (float)
 
+		; pongo la respuesta en [hsl_suma_dato], aca voy a mantener el dato respuesta
 		movdqu [hsl_suma_dato], xmm0 ; [hsl_suma_dato] = |a|h+HH|s+SS|l+LL| (float)
 
-		movdqu xmm3, [hsl_fix_dato]
+		; uso xmm3 para comparar y fixear el HUE resultante
+		movdqu xmm3, [hsl_fix_dato] ; xmm0 = |0.0|0.0|360.0|0.0| (float)
 
 		.check_max:
 
@@ -102,17 +106,15 @@ ASM_hsl1:
 			.check_max_hue:
 			cmp edi, FALSE
 			jne .check_max_sat ; if ( (h < max_h) == false )
-			movdqu xmm0, xmm2
-			subps xmm0, xmm3
-			movdqu [hsl_temp_dato], xmm0
-			mov dword r12d, [hsl_temp_dato+HSL_OFFSET_HUE]
-			mov dword [hsl_suma_dato+HSL_OFFSET_HUE], r12d ; h = h - 360
+			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
+			subps xmm0, xmm3 ; xmm0 = |l+LL|s+SS|h+HH-360|a| (float)
+			movdqu [hsl_suma_dato], xmm0 ; [hsl_suma_dato] = |a|h+HH-360|s+SS|l+LL|
 
 			.check_max_sat:
 			cmp esi, FALSE
 			jne .check_max_lum ; if ( (s < max_s) == false )
-			mov dword r13d, [hsl_max_dato+HSL_OFFSET_SAT]
-			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r13d ; s = max_s
+			mov dword r14d, [hsl_max_dato+HSL_OFFSET_SAT]
+			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r14d ; s = max_s
 
 			.check_max_lum:
 			cmp edx, FALSE
@@ -124,7 +126,7 @@ ASM_hsl1:
 
 			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
 			movdqu xmm1, [hsl_min_dato]
-			cmpnltps xmm0, xmm1 ; xmm0 = |l > 0.0|s > 0.0|h > 0.0|a > 0.0| (bool)
+			cmpnltps xmm0, xmm1 ; xmm0 = |l >= 0.0|s >= 0.0|h >= 0.0|a >= 0.0| (bool)
 			movdqu [hsl_temp_dato], xmm0 ; [hsl_temp_dato] = |a > 0.0|h > 0.0|s > 0.0|l > 0.0| (bool)
 
 			mov dword edi, [hsl_temp_dato+HSL_OFFSET_HUE] ; edi = h >= 0.0
@@ -134,17 +136,17 @@ ASM_hsl1:
 			.check_min_hue:
 			cmp edi, FALSE
 			jne .check_min_sat ; if ( (h >= min_h) == false )
-			movdqu xmm0, xmm2
-			addps xmm0, xmm3
-			movdqu [hsl_temp_dato], xmm0
-			mov dword r12d, [hsl_temp_dato+HSL_OFFSET_HUE]
-			mov dword [hsl_suma_dato+HSL_OFFSET_HUE], r12d ; h = h + 360
+			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
+			addps xmm0, xmm3 ; xmm0 = |l+LL|s+SS|h+HH+360|a| (float)
+			movdqu [hsl_temp_dato], xmm0 ; [hsl_temp_dato] = |a|h+HH+360|s+SS|l+LL|
+			mov dword r14d, [hsl_temp_dato+HSL_OFFSET_HUE] ; r14d = h+HH+360
+			mov dword [hsl_suma_dato+HSL_OFFSET_HUE], r14d ; h+HH+360 ; obs: no puedo sobreescribir todo
 
 			.check_min_sat:
 			cmp esi, FALSE
 			jne .check_min_lum ; if ( (s >= min_s) == false )
-			mov dword r13d, [hsl_min_dato+HSL_OFFSET_SAT]
-			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r13d ; s = min_s
+			mov dword r14d, [hsl_min_dato+HSL_OFFSET_SAT]
+			mov dword [hsl_suma_dato+HSL_OFFSET_SAT], r14d ; s = min_s
 
 			.check_min_lum:
 			cmp edx, FALSE
@@ -173,8 +175,6 @@ ASM_hsl1:
 	pop rbx
 	pop r15
 	pop r14
-	pop r13
-	pop r12
 	pop rbp
 	ret
   
