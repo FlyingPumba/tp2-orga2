@@ -197,8 +197,6 @@ rgbTOhsl:
 
     movdqu xmm5, xmm4 ; xmm5 = xmm4
     movdqu xmm6, xmm4 ; xmm6 = xmm4
-
-    movdqu xmm5, xmm4 ; xmm5 = xmm4
     
     pslldq xmm4, 4 ; xmm4 = | R | G | B | 0 |
     pmaxud xmm5, xmm4 ; xmm5 = | - | max(R,G) | - | - |
@@ -219,7 +217,7 @@ rgbTOhsl:
     divps xmm9, xmm7 ; xmm9 = | - | L | - | - |
     pslldq xmm9, 4 ;  xmm9 = | L | - | - | 0 |
     psrldq xmm9, 12 ; xmm9 = | 0 | 0 | 0 | L |
-    addps xmm8, xmm9 ; agrego a xmm8 la componente de L
+    addps xmm8, xmm9 ; xmm8 = | 0 | 0 | 0 | L |
 
     ; calculo S
     cmp ecx, FALSE
@@ -229,7 +227,7 @@ rgbTOhsl:
     movdqu xmm7, [hsl_second_dword_one]
     addps xmm7, xmm7 ; xmm7 = | 0 | 2.0 | 0 | 0 |
     mulps xmm9, xmm7 ; xmm9 = | 0 | 2L | 0 | 0 |
-    subps xmm7, xmm7 ; xmm7 = | 0 | 1.0 | 0 | 0 |
+    movdqu xmm7, [hsl_second_dword_one] ; xmm7 = | 0 | 1.0 | 0 | 0 |
     subps xmm9, xmm7 ; xmm9 = | 0 | 2L - 1 | 0 | 0 |
     movdqu xmm10, [hsl_fabs_mask]
     andps xmm9, xmm10  ; xmm9 = | 0 | fabs(2L - 1) | 0 | 0 |
@@ -237,6 +235,7 @@ rgbTOhsl:
     movdqu xmm9, [hsl_second_dword_zero] ; para no dividir por 0
     addps xmm7, xmm9 ; xmm7 = | 1 | 1 - fabs(2L -1) | 1 | 1 | 
     movdqu xmm9, xmm4
+    cvtdq2ps xmm9, xmm9 ; xmm9 = floats(0, d, 0, 0)
     divps xmm9, xmm7 ; xmm9 = | 0 | d/(1 - fabs(2L -1)) | 0 | 0 |
     movdqu xmm7, [hsl_s_divisor]
     divps xmm9, xmm7 ; xmm9 = | 0 | d/(1 - fabs(2L -1))/255.0001 | 0 | 0 |
@@ -255,16 +254,16 @@ rgbTOhsl:
     punpckhbw xmm7, xmm9
     punpckhwd xmm7, xmm9 ; xmm7 = ints(p)
     
-    pshufd xmm9, xmm7, 0b00110110
+    pshufd xmm9, xmm7, 0b11010010 ; xmm0 = ints(a, g, b, r)
 
-    psubd xmm7, xmm9 ; | 0 | r-g | g-b | b-r |
-    cvtdq2ps xmm7, xmm7 ; xmm7 = floats(0,r-g,g-b,b-r)
-    cvtdq2ps xmm4, xmm4 ; xmm4 = floats(0, d, 0, 0)
+    psubd xmm7, xmm9 ; | - | r-g | g-b | b-r |
+    cvtdq2ps xmm7, xmm7 ; xmm7 = floats(-,r-g,g-b,b-r)
+    cvtdq2ps xmm4, xmm4 ; xmm4 = floats(-, d, 0, 0)
     pshufd xmm4, xmm4, 0b10101010 ; xmm4 = floats(d, d, d, d)
 
-    divps xmm7, xmm4 ; xmm7 = | 0 | r-g/d | g-b/d | b-r/d |
+    divps xmm7, xmm4 ; xmm7 = | 0 | (r-g)/d | (g-b)/d | (b-r)/d |
     movdqu xmm10, [hsl_h_add_mask]
-    addps xmm7, xmm10 ; xmm7 = | 0 | r-g/d + 4 | g-b/d + 6 | b-r/d + 2 |
+    addps xmm7, xmm10 ; xmm7 = | 0 | (r-g)/d + 4 | (g-b)/d + 6 | (b-r)/d + 2 |
     movdqu xmm10, [hsl_sixty_mask]
     mulps xmm7, xmm10 ; xmm7 = 60*xmm7
 
@@ -288,10 +287,10 @@ rgbTOhsl:
     pslldq xmm7, 4
 
     .rgbTOhsl_h_fin:
-    movdqu xmm11, [hsl_second_dword_mask]
-    andps xmm7, xmm11 ; limpio xmm7
+    movdqu xmm4, [hsl_second_dword_mask]
+    pand xmm7, xmm4 ; limpio xmm7
     
-    extractps edx, xmm7, 12
+    extractps edx, xmm7, 2
     cmp edx, 360
     jl .rgbTOhsl_h_sum_fin
 
@@ -301,7 +300,6 @@ rgbTOhsl:
     addps xmm8, xmm7
 
     .rgbTOhsl_fin:
-
     movdqu [rsi], xmm8
 
     ret
