@@ -44,7 +44,7 @@ ASM_merge1:
   xor rsi, rsi ; contador de bytes procesados
   .ciclo:
       cmp rsi, rax
-      jg .fin
+      jge .fin
 
       ; vamos a cargar la mayor cantidad de pixeles que podamos, que en memoria se veria:
       ; data1 = | p1-0 | p1-1 | p1-2 | p1-3 |
