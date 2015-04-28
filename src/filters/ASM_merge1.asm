@@ -41,16 +41,16 @@ ASM_merge1:
   mov rsi, PIXEL_SIZE ; rsi = PIXEL_SIZE
   mul rsi ; rax = w * h * PIXEL_SIZE = *data.size()
 
-  xor rsi, rsi ; contador de bytes procesados
+  xor rcx, rcx ; contador de bytes procesados
   .ciclo:
-      cmp rsi, rax
+      cmp rcx, rax
       jge .fin
 
       ; vamos a cargar la mayor cantidad de pixeles que podamos, que en memoria se veria:
       ; data1 = | p1-0 | p1-1 | p1-2 | p1-3 |
       ; data2 = | p2-0 | p2-1 | p2-2 | p2-3 |
-      movdqu xmm1, [r8 + rsi] ; xmm1 = | p1-3 | p1-2 | p1-1 | p1-0 |
-      movdqu xmm2, [r9 + rsi] ; xmm2 = | p2-3 | p2-2 | p2-1 | p2-0 |
+      movdqu xmm1, [r8 + rcx] ; xmm1 = | p1-3 | p1-2 | p1-1 | p1-0 |
+      movdqu xmm2, [r9 + rcx] ; xmm2 = | p2-3 | p2-2 | p2-1 | p2-0 |
 
       ; ahora, convierto todos los canales de 1 byte a canales de 2 bytes
       ; entonces, cada pixel va a pasar a medir 8 bytes (64bits) en vez de 4 bytes
@@ -140,10 +140,10 @@ ASM_merge1:
       por xmm5, xmm9 ; xmm5 = | p1-3 * value + p2-3 * (1-value) | p1-2 * value + p2-2 * (1-value) | p1-1 * value + p2-1 * (1-value) | p1-0 * value + p2-0 * (1-value) |
 
       ; bajo a memoria en el mismo lugar donde levante los 4 pixeles de *data1
-      movdqu [r8 + rsi], xmm5
+      movdqu [r8 + rcx], xmm5
 
       ;incremento el puntero para ir al proximo pixel
-      lea rsi, [rsi + 4*PIXEL_SIZE]
+      lea rcx, [rcx + 4*PIXEL_SIZE]
       jmp .ciclo
   .fin:
   ;*******
