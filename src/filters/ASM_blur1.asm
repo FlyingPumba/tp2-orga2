@@ -54,45 +54,46 @@ ASM_blur1:
     .ciclo_vectores_inicial:
         cmp rdi, r8
         jge .procesar_fila
-        mov QWORD rsi, [rbx + rdi] ; copio un pixel de la primera fila
-        mov QWORD [r15 + rdi], rsi ; pego un pixel
-        add rdi, PIXEL_SIZE
-        add rdi, PIXEL_SIZE
+        movdqu xmm0, [rbx + rdi] ; copio 4 pixeles
+        movdqu [r15 + rdi], xmm0 ; pego 4 pixeles
+        lea rdi, [rdi + 4*PIXEL_SIZE]
         jmp .ciclo_vectores_inicial
 
     .procesar_fila:
     xor rcx, rcx ; contador de filas (en pixeles)
     .ciclo_fila:
         ; preparo rdi como registro auxiliar para levantar datos
-        mov rax, r8
-        mul rcx
+        mov rax, r8 ; rax = width * 4
+        mul rcx ; rax = contador_filas * width * 4
         mov rdi, rax ; rdi = contador_filas * width * 4 (offset de fila actual)
 
         ; cargo los nuevos vectores auxiliares
         xor rdx, rdx ; contador de columnas (en bytes)
 
+        ;pongo en [r14] los datos de la fila anterior, para eso, intercambio los punteros de r14 y r15
+        mov rax, r15
+        mov r15, r14
+        mov r14, rax
+
+        ;pongo en [r15] los datos de la fila actual
         lea rax, [rbx + rdi] ; rax apunta a donde empieza la fila actual
         add rax, r8 ; rax = rax + width * 4 = fila siguiente
         .ciclo_vectores_nuevos:
             cmp rdx, r8
             jge .procesar_columna ; if (contador_columnas) >= ancho_imagen
-            mov DWORD esi, [r15 + rdx] ; copio un pixel del vector auxiliar en la fila mas alta
-            mov DWORD [r14 + rdx], esi ; al vector auxiliar en la fila mas baja
-            
-            ; cargo el nuevo pixel correspondiente en el vector auxiliar de una fila mas arriba que la actual
-            mov DWORD esi, [rax + rdx]
-            mov DWORD [r15 + rdx], esi
 
-            add rdx, PIXEL_SIZE
+            ; cargo el nuevo pixel correspondiente en el vector auxiliar de una fila mas arriba que la actual
+            movdqu xmm0, [rax + rdx] ; copio 4 pixeles de la fila actual en xmm0
+            movdqu [r15 + rdx], xmm0 ; los paso al vector de r15
+
+            lea rdx, [rdx + 4*PIXEL_SIZE] ; aumento el indice segun los 4 pixeles
             jmp .ciclo_vectores_nuevos
 
         .procesar_columna:
         xor rdx, rdx ; contador de columnas (en bytes)
         .ciclo_columna:
-            mov rsi, rdx ; rsi = contador_columnas (bytes)
-            add rsi, rdi ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
-            add rsi, r8 ; rsi = rsi + width*4
-            add rsi, r8 ; rsi = rsi + width*4
+            lea rsi, [rdi +rdx] ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
+            lea rsi, [rsi + 2*r8] ; rsi = dos filas mas adelante que rdi (una mas que la actual)
             ; vamos a cargar una matriz de pixeles, que en memoria se veria:
             ; | p0 | p1 | p2 |
             ; | p3 | p4 | p5 |
