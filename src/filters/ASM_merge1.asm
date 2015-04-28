@@ -42,9 +42,6 @@ ASM_merge1:
   mov r8, r12
   shl r8, 2 ; r8 = width * 4 (ancho en bytes de la imagen)
 
-  mov r9, r8
-  sub r9, 8; r9 = width * 4 - 8 (ancho en bytes a recorrer)
-
   xor rcx, rcx ; contador de filas (en pixeles)
   .ciclo_fila:
       ; preparo rdi como registro auxiliar para levantar datos
@@ -153,7 +150,7 @@ ASM_merge1:
           movdqu [r14 + rsi], xmm5
 
           add rdx, 16 ; incremento en 16 (4 pixeles * 4 bytes c/u) el contador_columna
-          cmp rdx, r9
+          cmp rdx, r8
           jl .ciclo_columna
 
       inc rcx	; Incremento el contador de filas
