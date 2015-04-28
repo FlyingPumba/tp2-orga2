@@ -9,7 +9,7 @@ img0=${img0%%.*}
 img1=${IMAGENES[1]}
 img1=${img1%%.*}
 
-VALGRINDFLAGS="--leak-check=no --error-exitcode=1 -q"
+VALGRINDFLAGS="--error-exitcode=1 --leak-check=full -q"
 
 #$1 : Programa Ejecutable
 #$2 : Filtro e Implementacion Ejecutar
@@ -22,7 +22,7 @@ function run_test {
     if [ $? -ne 0 ]; then
       echo -e "$ROJO ERROR DE MEMORIA";
       echo -e "$AZUL Corregir errores en $2. Ver de probar la imagen $3, que se rompe.";
-      echo -e "$AZUL Correr nuevamente $DEFAULT valgrind $VALGRINDFLAGS $1 $2 $3 $ALUMNOSDIR/$4 $5";
+      echo -e "$AZUL Correr nuevamente $DEFAULT valgrind --leak-check=full $1 $2 $3 $ALUMNOSDIR/$4 $5";
       ret=-1; return;
     fi
     ret=0; return;
