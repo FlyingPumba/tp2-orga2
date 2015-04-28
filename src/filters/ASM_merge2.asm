@@ -79,8 +79,8 @@ ASM_merge2:
       jge .fin
 
       ; vamos a cargar la mayor cantidad de pixeles que podamos, que en memoria se veria:
-      ; data1 = | p1-0 | p1-1 | p1-2 | p1-3 | p1-4 | p1-5 | p1-6 | p1-7 |
-      ; data2 = | p2-0 | p2-1 | p2-2 | p2-3 | p2-4 | p2-5 | p2-6 | p2-7 |
+      ; data1 = | p1-0 | p1-1 | p1-2 | p1-3 |
+      ; data2 = | p2-0 | p2-1 | p2-2 | p2-3 |
       movdqu xmm1, [r8 + rcx] ; xmm1 = | p1-3 | p1-2 | p1-1 | p1-0 |
       movdqu xmm2, [r9 + rcx] ; xmm2 = | p2-3 | p2-2 | p2-1 | p2-0 |
 
