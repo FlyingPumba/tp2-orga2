@@ -12,9 +12,9 @@
 // HSB = Hue, Saturation, Brightness
 
 void rgbTOhsl(uint8_t *src, float *dst) {
-  int r = (int)src[1];
+  int b = (int)src[1];
   int g = (int)src[2];
-  int b = (int)src[3];
+  int r = (int)src[3];
   int cmax = max(b,g,r);
   int cmin = min(b,g,r);
   float d = (float)(cmax -cmin);
@@ -50,22 +50,22 @@ void hslTOrgb(float *src, uint8_t *dst) {
   float m = l - c/2.0f;
   float r,g,b;
   if( 0.0f<=h && h<60.0f ) {
-    r=c;    b=x;    g=0.0f;
+    r=c;    g=x;    b=0.0f;
   } else if(  60.0f<=h && h<120.0f ) {
-    r=x;    b=c;    g=0.0f;
+    r=x;    g=c;    b=0.0f;
   } else if( 120.0f<=h && h<180.0f ) {
-    r=0.0f; b=c;    g=x;
+    r=0.0f; g=c;    b=x;
   } else if( 180.0f<=h && h<240.0f ) {
-    r=0.0f; b=x;    g=c;
+    r=0.0f; g=x;    b=c;
   } else if( 240.0f<=h && h<300.0f ) {
-    r=x;    b=0.0f; g=c;
+    r=x;    g=0.0f; b=c;
   } else if( 300.0f<=h && h<360.0f ) {
-    r=c;    b=0.0f; g=x;
+    r=c;    g=0.0f; b=x;
   }
   dst[0]=(int)src[0];
-  dst[1]=(r+m)*255.0f;
-  dst[2]=(b+m)*255.0f;
-  dst[3]=(g+m)*255.0f;
+  dst[1]=(b+m)*255.0f;
+  dst[2]=(g+m)*255.0f;
+  dst[3]=(r+m)*255.0f;
 }
 
 int max(int a, int b, int c) {

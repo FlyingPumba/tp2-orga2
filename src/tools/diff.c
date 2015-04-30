@@ -44,7 +44,6 @@ int main(int argc, char* argv[]){
   int len2 = strlen(opt.file2);
   if( strcmp(&(opt.file1[len1-4]),".bmp") || strcmp(&(opt.file2[len2-4]),".bmp") )
   { printf("ERROR: nombre del archivo\n"); return -1;}
-  opt.value = opt.value<1 ? 1 : ( opt.value>256 ? 255 : opt.value );
   
   // (0.1) siempre armo el summary
   opt.summary = (int*)malloc(sizeof(int)*256);

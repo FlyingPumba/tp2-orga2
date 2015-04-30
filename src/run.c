@@ -12,8 +12,8 @@ int run_blur(int c, char* src, char* dst){
   if(bmp==0) { return -1;}  // open error
   
   uint8_t* data = bmp_get_data(bmp);
-  uint32_t h = *(bmp_get_w(bmp));
-  uint32_t w = *(bmp_get_h(bmp));
+  uint32_t h = *(bmp_get_h(bmp));
+  uint32_t w = *(bmp_get_w(bmp));
   if(w%4!=0) { return -1;}  // do not support padding
   
   uint8_t* dataC = 0;
@@ -47,10 +47,10 @@ int run_merge(int c, char* src1, char* src2, char* dst, float value){
   
   uint8_t* data1 = bmp_get_data(bmp1);
   uint8_t* data2 = bmp_get_data(bmp2);
-  uint32_t h1 = *(bmp_get_w(bmp1));
-  uint32_t w1 = *(bmp_get_h(bmp1));
-  uint32_t h2 = *(bmp_get_w(bmp2));
-  uint32_t w2 = *(bmp_get_h(bmp2));
+  uint32_t h1 = *(bmp_get_h(bmp1));
+  uint32_t w1 = *(bmp_get_w(bmp1));
+  uint32_t h2 = *(bmp_get_h(bmp2));
+  uint32_t w2 = *(bmp_get_w(bmp2));
   if(w1%4!=0 || w2%4!=0) { return -1;}  // do not support padding
   if( w1!=w2 || h1!=h2 ) { return -1;}  // different image size
   
@@ -88,8 +88,8 @@ int run_hsl(int c, char* src, char* dst, float hh, float ss, float ll) {
   if(ss>1) ss=1; else if(ss<-1) ss=-1;
   if(ll>1) ll=1; else if(ll<-1) ll=-1;
   uint8_t* data = bmp_get_data(bmp);
-  uint32_t h = *(bmp_get_w(bmp));
-  uint32_t w = *(bmp_get_h(bmp));
+  uint32_t h = *(bmp_get_h(bmp));
+  uint32_t w = *(bmp_get_w(bmp));
   if(w%4!=0) { return -1;}  // do not support padding
   
   uint8_t* dataC = 0;
