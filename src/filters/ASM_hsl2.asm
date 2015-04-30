@@ -29,11 +29,11 @@ hsl_min_dato: dd 0.0, 0.0, 0.0, 0.0 ; |0.0|0.0|0.0|0.0|
 hsl_fix_dato: dd 0.0, 360.0, 0.0, 0.0 ; |0.0|360.0|0.0|0.0|
 
 hsl_second_dword_mask: dd 0, 0xffffffff, 0, 0 ; |1..1|0|0|0|
-hsl_second_dword_one: dd 0.0, 1.0, 0.0, 0.0 ; |1..1|0|0|0|
-hsl_l_divisor: dd 1.0, 510.0, 1.0, 1.0 ; |1.0|510.0|1.0|1.0|
-hsl_s_divisor: dd 1.0, 255.0001, 1.0, 1.0 ; |1.0|255.001|1.0|1.0|
+hsl_second_dword_one: dd 0.0, 0.0, 1.0, 0.0 ; |1..1|0|0|0|
+hsl_l_divisor: dd 1.0, 510.0, 1.0, 1.0 ; |1.0|1.0|510.0|1.0|
+hsl_s_divisor: dd 1.0, 1.0, 255.0001, 1.0 ; |1.0|255.001|1.0|1.0|
 hsl_fabs_mask: dd 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff
-hsl_second_dword_zero: dd 1.0, 0.0, 1.0, 1.0
+hsl_second_dword_zero: dd 1.0, 1.0, 0.0, 1.0
 hsl_sixty_mask: dd 60.0, 60.0, 60.0, 60.0
 hsl_final_sub_mask: dd 0.0, 360.0, 360.0, 360.0
 hsl_h_add_mask: dd 0.0, 4.0, 6.0, 2.0
@@ -189,35 +189,36 @@ rgbTOhsl:
     pxor xmm8, xmm8
 
     ; calculo cmax, cmin y d
-    movdqu xmm4, [rdi] ; guardo en xmm4 el contenido del pixel (y sus vecinos)
-    ; desempaqueto convierto las componentes del pixel a int de 32 bits
+    movd xmm4, [rdi] ; xmm4 = | ceros | R | G | B | A | (cada canal en int 8b)
+    ; convierto las componentes del pixel a int 8b a int 32b
     pxor xmm6, xmm6 ; limpio xmm6
-    punpckhbw xmm4, xmm6
-    punpckhwd xmm4, xmm6 ; xmm4 = ints(p)
+    punpcklbw xmm4, xmm6 ; xmm4 = | ceros | R | G | B | A | (cada canal en int 16b)
+    punpcklwd xmm4, xmm6 ; xmm4 = | R | G | B | A | (cada canal en int 32b)
 
-    movdqu xmm5, xmm4 ; xmm5 = xmm4
-    movdqu xmm6, xmm4 ; xmm6 = xmm4
-    
-    pslldq xmm4, 4 ; xmm4 = | R | G | B | 0 |
-    pmaxud xmm5, xmm4 ; xmm5 = | - | max(R,G) | - | - |
-    pminud xmm6, xmm4 ; xmm6 = | - | min(R,G) | - | - |
-    pslldq xmm4, 4 ; xmm4 = | G | B | 0 | 0 |
-    pmaxud xmm5, xmm4 ; xmm5 = | - | max(R,G,B) | - | - |
-    pminud xmm6, xmm4 ; xmm6 = | - | min(R,G,B) | - | - |
-    movdqu xmm4, xmm5 
-    psubd xmm4, xmm6 ; xmm4 = | - | max + min | - | - |
+    movdqu xmm5, xmm4 ; xmm5 = | R | G | B | A |
+    movdqu xmm6, xmm4 ; xmm6 = | R | G | B | A |
 
-    pextrd ecx, xmm4, 2 ; ecx = maxc - minc = d
+    psrldq xmm4, 4 ; xmm4 = | 0 | R | G | B |
+
+    pmaxud xmm5, xmm4 ; xmm5 = | - | - | max(G,B) | - |
+    pminud xmm6, xmm4 ; xmm6 = | - | - | min(G,B) | - |
+    psrldq xmm4, 4 ; xmm4 = | 0 | 0 | R | G |
+    pmaxud xmm5, xmm4 ; xmm5 = | - | - | max(R,G,B) | - |
+    pminud xmm6, xmm4 ; xmm6 = | - | - | min(R,G,B) | - |
+    movdqu xmm4, xmm5 ; xmm4 = | - | - | max(R,G,B) | - |
+    psubd xmm4, xmm6 ; xmm4 = | - | - | max - min | - |
+
+    pextrd ecx, xmm4, 1 ; ecx = maxc - minc = d
 
     ; calculo L
-    movdqu xmm9, xmm5 ; xmm9 = | - | max(R,G,B) | - | - |
-    paddd xmm9, xmm6 ; xmm9 = | - | max + min | - | - |
-    cvtdq2ps xmm9, xmm9 ; xmm7 = | - | float(max + min) | - | - |
+    movdqu xmm9, xmm5 ; xmm9 = | - | - | max(R,G,B) | - |
+    paddd xmm9, xmm6 ; xmm9 = | - | - | max + min | - |
+    cvtdq2ps xmm9, xmm9 ; xmm9 = | - | - | float(max + min) | - |
     movdqu xmm7, [hsl_l_divisor]
-    divps xmm9, xmm7 ; xmm9 = | - | L | - | - |
-    pslldq xmm9, 4 ;  xmm9 = | L | - | - | 0 |
-    psrldq xmm9, 12 ; xmm9 = | 0 | 0 | 0 | L |
-    addps xmm8, xmm9 ; xmm8 = | 0 | 0 | 0 | L |
+    divps xmm9, xmm7 ; xmm9 = | - | - | L | - |
+	pslldq xmm9, 8 ;  xmm9 = | L | - | - | - |
+    psrldq xmm9, 12 ;  xmm9 = | 0 | 0 | 0 | L |
+	movdqu xmm8, xmm9 ;  xmm8 = | 0 | 0 | 0 | L |
 
     ; calculo S
     cmp ecx, FALSE
@@ -233,27 +234,30 @@ rgbTOhsl:
     andps xmm9, xmm10  ; xmm9 = | 0 | fabs(2L - 1) | 0 | 0 |
     subps xmm7, xmm9 ; xmm7 = | 0 | 1 - fabs(2L - 1) | 0 | 0 |
     movdqu xmm9, [hsl_second_dword_zero] ; para no dividir por 0
-    addps xmm7, xmm9 ; xmm7 = | 1 | 1 - fabs(2L -1) | 1 | 1 | 
-    movdqu xmm9, xmm4
-    cvtdq2ps xmm9, xmm9 ; xmm9 = floats(0, d, 0, 0)
-    divps xmm9, xmm7 ; xmm9 = | 0 | d/(1 - fabs(2L -1)) | 0 | 0 |
+    addps xmm7, xmm9 ; xmm7 = | 1 | 1 - fabs(2L -1) | 1 | 1 |
+    movdqu xmm9, xmm4 ; xmm9 = | - | - | max - min | - |
+	pslldq xmm9, 4 ; xmm9 = | - | max - min | - | - |
+    cvtdq2ps xmm9, xmm9; xmm9 = | - | float(max - min) | - | - |
+    divps xmm9, xmm7 ; xmm9 = | - | d/(1 - fabs(2L -1)) | - | - |
     movdqu xmm7, [hsl_s_divisor]
     divps xmm9, xmm7 ; xmm9 = | 0 | d/(1 - fabs(2L -1))/255.0001 | 0 | 0 |
 
-    psrldq xmm9, 4 ; xmm9 = | 0 | 0 | S | 0 |
-    addps xmm8, xmm9
-    
+    pslldq xmm9, 4 ; xmm9 = | S | - | -| 0 |
+	psrldq xmm9, 12 ; xmm9 = | 0 | 0 | 0 | S |
+	pslldq xmm9, 4 ; xmm9 = | 0 | 0 | S | 0 |
+    addps xmm8, xmm9 ; xmm9 = | 0 | 0 | S | L |
+
     .rgbTOhsl_calc_h:
     ; calculo h
     cmp ecx, FALSE
     je .rgbTOhsl_fin ; si cmax == cmin dejo h en 0
 
     ; ordeno los datos
-    movdqu xmm7, [rdi]
+	movd xmm7, [rdi] ; xmm7 = | ceros | R | G | B | A | (cada canal en int 8b)
     pxor xmm9, xmm9 ; limpio xmm9
-    punpckhbw xmm7, xmm9
-    punpckhwd xmm7, xmm9 ; xmm7 = ints(p)
-    
+    punpcklbw xmm7, xmm6 ; xmm4 = | ceros | R | G | B | A | (cada canal en int 16b)
+    punpcklwd xmm7, xmm6 ; xmm4 = | R | G | B | A | (cada canal en int 32b)
+
     pshufd xmm9, xmm7, 0b11010010 ; xmm0 = ints(a, g, b, r)
 
     psubd xmm7, xmm9 ; | - | r-g | g-b | b-r |
@@ -267,7 +271,7 @@ rgbTOhsl:
     movdqu xmm10, [hsl_sixty_mask]
     mulps xmm7, xmm10 ; xmm7 = 60*xmm7
 
-    pextrd ecx, xmm5, 12 ; ecx = maxc 
+    pextrd ecx, xmm5, 12 ; ecx = maxc
     .rgbTOhsl_max_r:
     extractps edx, xmm9, 0 ; edx = r
     cmp edx, ecx
@@ -289,13 +293,13 @@ rgbTOhsl:
     .rgbTOhsl_h_fin:
     movdqu xmm4, [hsl_second_dword_mask]
     pand xmm7, xmm4 ; limpio xmm7
-    
+
     extractps edx, xmm7, 2
     cmp edx, 360
     jl .rgbTOhsl_h_sum_fin
 
     subps xmm7, [hsl_final_sub_mask]
-    
+
     .rgbTOhsl_h_sum_fin:
     addps xmm8, xmm7
 
