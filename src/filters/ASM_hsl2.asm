@@ -215,16 +215,24 @@ rgbTOhsl:
     movdqu xmm3, xmm1  ; xmm3 = | max(R,G,B) | max(G,B,A) | max(B,A) | A | (int 32b)
     psubd xmm3, xmm2  ; xmm3 = | max(R,G,B) - min(R,G,B) | max(G,B,A) - min(G,B,A) | max(B,A) | A | (int 32b)
 
+	; guardo d en ecx para hacer despues las comparaciones en el calculo de H y S
 	psrldq xmm3, 12 ; xmm3 = | 0 | 0 | 0 | max(R,G,B) - min(R,G,B) | (int 32b)
 	movd ecx, xmm3 ; ecx = maxc - minc = d (int 32b)
-	psrldq xmm1, 12 ; xmm3 = | 0 | 0 | 0 | max(R,G,B) | (int 32b)
+
+	; preparo en xmm4 cmax + cmin, para el calculo de L
+	movdqu xmm4, xmm1 ; xmm4 = | max(R,G,B) | max(G,B,A) | max(B,A) | A | (int 32b)
+	paddd xmm4, xmm2 ; xmm4 = | max(R,G,B) + min(R,G,B) | max(G,B,A) + min(G,B,A) | max(B,A) | A | (int 32b)
+	psrldq xmm4, 12 ; xmm4 = | 0 | 0 | 0 | max(R,G,B) + min(R,G,B) | (int 32b)
+
+	; preparo en xmm1 cmax, para el calculo de H
+	psrldq xmm1, 12 ; xmm4 = | 0 | 0 | 0 | max(R,G,B) | (int 32b)
 
     ; calculo L
-    movdqu xmm4, xmm3 ; xmm4 = | 0 | 0 | 0 | max(R,G,B) - min(R,G,B) | (int 32b)
-    cvtdq2ps xmm4, xmm4 ; xmm4 = | 0 | 0 | 0 | float(d) |
+    cvtdq2ps xmm4, xmm4 ; xmm4 = | 0 | 0 | 0 | float(cmax + cmin) |
     movdqu xmm13, [hsl_l_divisor] ; xmm13 = | 1.0 | 1.0 | 1.0 | 510.0 |
-    divps xmm4, xmm13 ; xmm4 = | 0 | 0 | 0 | L = d/510 | (floats SP)
+    divps xmm4, xmm13 ; xmm4 = | 0 | 0 | 0 | L = (cmax + cmin)/510 | (floats SP)
 	movdqu xmm14, xmm4 ;  xmm14 = | 0 | 0 | 0 | L | (floats SP)
+	pslldq xmm14, 12 ; xmm14 = | L | 0 | 0 | 0 | (floats SP)
 
     ; calculo S
     cmp ecx, DWORD 0
@@ -252,8 +260,8 @@ rgbTOhsl:
     divps xmm4, xmm5 ; xmm4 = | 0 | 0 | 0 | S = d/(1 - fabs(2*L -1))/255.0001 | (floats SP)
 
 	; ubico S en el registro de resultados
-	pslldq xmm4, 4 ; xmm4 = | 0 | 0 | S | 0 |
-    addps xmm14, xmm4 ; xmm14 = | 0 | 0 | S | L |
+	pslldq xmm4, 8 ; xmm4 = | 0 | S | 0 | 0 |
+    addps xmm14, xmm4 ; xmm14 = | L | S | 0 | 0 |
 
     .rgbTOhsl_calc_h:
     ; calculo H
@@ -268,6 +276,7 @@ rgbTOhsl:
 	movdqu xmm6, xmm0 ; xmm6 = | R | G | B | A | (int 32b)
 	psrldq xmm6, 8 ; xmm6 = | 0 | 0 | R | G | (int 32b)
 	paddd xmm5, xmm6 ; xmm5 = | G | B | R | G | (int 32b)
+	; hago la resta
 	psubd xmm4, xmm5 ; xmm4 = | R-G | G-B | B-R | A-G | (int 32b)
 
 	; divido por d
@@ -301,7 +310,7 @@ rgbTOhsl:
 	movd r9d, xmm2 ; r9d = R (int 32b)
 
     .rgbTOhsl_max_r:
-    cmp edx, eax
+    cmp edx, r9d
     jne .rgbTOhsl_max_g
 	; cmax == R
 	psrldq xmm4, 8 ; xmm4 = | 0 | 0 | 60 * ((R-G)/d + 4) | 60 * ((G-B)/d + 6) | (floats SP)
@@ -327,18 +336,20 @@ rgbTOhsl:
 	movd xmm1, edx ; xmm1 = | 0 | 0 | 0 | H | (float SP)
 	movdqu xmm2, [hsl_sub_360] ; xmm2 = | 0.0 | 0.0 | 0.0 | 360.0 |
 	subps xmm1, xmm2 ; xmm1 = | 0 | 0 | 0 | H-360 | (float SP)
-	pslldq xmm1, 8 ; xmm1 = | 0 | H-360 | 0 | 0 | (float SP)
-	addps xmm14, xmm1 ; xmm14 = | 0 | H | S | L |
+	pslldq xmm1, 4 ; xmm1 = | 0 | 0 | H-360 | 0 | (float SP)
+	addps xmm14, xmm1 ; xmm14 = | L | S | H | 0 |
 	jmp .rgbTOhsl_fin
 
     .rgbTOhsl_h_menor_360:
 	movd xmm1, edx ; xmm1 = | 0 | 0 | 0 | H | (float SP)
-	pslldq xmm1, 8 ; xmm1 = | 0 | H | 0 | 0 | (float SP)
-	addps xmm14, xmm1 ; xmm14 = | 0 | H | S | L |
+	pslldq xmm1, 4 ; xmm1 = | 0 | 0 | H | 0 | (float SP)
+	addps xmm14, xmm1 ; xmm14 = | L | S | H | 0 |
 
     .rgbTOhsl_fin:
-	pslldq xmm0, 12 ; xmm0 = | A | 0 | 0 | 0 |
-	por xmm14, xmm0 ; xmm14 = | A | H | S | L |
+	pslldq xmm0, 12 ; xmm0 = | A | 0 | 0 | 0 | (int 32b)
+	psrldq xmm0, 12 ; xmm0 = | 0 | 0 | 0 | A | (int 32b)
+	cvtdq2ps xmm0, xmm0 ; xmm0 = | 0 | 0 | 0 | A | (floats SP)
+	por xmm14, xmm0 ; xmm14 = | L | S | H | A |
     movdqu [rsi], xmm14
 	;*****
 	pop rbp
