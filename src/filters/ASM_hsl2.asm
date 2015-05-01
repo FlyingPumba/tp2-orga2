@@ -386,7 +386,7 @@ rgbTOhsl:
 		psrldq xmm2, 12 ; xmm2 = | 0 | 0 | 0 | S | (float SP)
 		movdqu xmm3, xmm0 ; xmm3 = | L | S | H | A | (floats SP)
 		pslldq xmm3, 8
-		psrldq xmm3, 12 ; xmm2 = | 0 | 0 | 0 | H | (float SP)
+		psrldq xmm3, 12 ; xmm3 = | 0 | 0 | 0 | H | (float SP)
 
 		; voy a usar xmm14, 13 y 12 para almacenar c, x y m respectivamente
 
