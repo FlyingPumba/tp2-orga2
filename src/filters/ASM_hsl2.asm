@@ -322,10 +322,10 @@ rgbTOhsl:
 	movd edx, xmm4 ; edx = 60 * ((R-G)/d + 4) (float SP)
 
     .rgbTOhsl_h_360:
-    cmp edx, DWORD 360.0
+    cmp edx, 360
     jl .rgbTOhsl_h_menor_360
 	movd xmm1, edx ; xmm1 = | 0 | 0 | 0 | H | (float SP)
-	mov xmm2, [hsl_sub_360] ; xmm2 = | 0.0 | 0.0 | 0.0 | 360.0 |
+	movdqu xmm2, [hsl_sub_360] ; xmm2 = | 0.0 | 0.0 | 0.0 | 360.0 |
 	subps xmm1, xmm2 ; xmm1 = | 0 | 0 | 0 | H-360 | (float SP)
 	pslldq xmm1, 8 ; xmm1 = | 0 | H-360 | 0 | 0 | (float SP)
 	addps xmm14, xmm1 ; xmm14 = | 0 | H | S | L |
