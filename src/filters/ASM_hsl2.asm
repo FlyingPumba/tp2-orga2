@@ -7,7 +7,6 @@
 
 ; void ASM_hsl2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
 global ASM_hsl2
-extern hslTOrgb
 %define RGB_PIXEL_SIZE     	4
 %define RGB_OFFSET_ALPHA 	0
 %define RGB_OFFSET_RED      1
@@ -28,6 +27,7 @@ hsl_max_dato: dd 1.0, 360.0, 1.0, 1.0 ; |max_a|max_h|max_s|max_l|
 hsl_min_dato: dd 0.0, 0.0, 0.0, 0.0 ; |0.0|0.0|0.0|0.0|
 hsl_fix_dato: dd 0.0, 360.0, 0.0, 0.0 ; |0.0|360.0|0.0|0.0|
 
+; mascaras para rgbTOhsl
 hsl_second_dword_mask: dd 0, 0xffffffff, 0, 0
 hsl_first_dword_one: dd 1.0, 0.0, 0.0, 0.0
 hsl_l_divisor: dd 510.0, 1.0, 1.0, 1.0
@@ -39,6 +39,9 @@ hsl_first_dword_zero: dd 0.0, 1.0, 1.0, 1.0
 hsl_h_add_mask: dd 0.0, 2.0, 6.0, 4.0
 hsl_sixty_mask: dd 60.0, 60.0, 60.0, 60.0
 hsl_sub_360: dd 360.0, 0.0, 0.0, 0.0
+
+; mascaras para hslTOrgb
+hsl_mul_255: dd 255.0, 255.0, 255.0, 255.0
 
 section .data
 
@@ -295,7 +298,7 @@ rgbTOhsl:
     addps xmm4, xmm6 ; xmm4 = | (R-G)/d + 4 | (G-B)/d + 6 | (B-R)/d + 2 | (A-G)/d | (floats SP)
 
 	; multiplico por 60
-    movdqu xmm6, [hsl_sixty_mask]
+    movdqu xmm6, [hsl_sixty_mask] ; xmm6 = | 60.0 | 60.0 | 60.0 | 60.0 |
     mulps xmm4, xmm6 ; xmm4 = | 60 * ((R-G)/d + 4) | 60 * ((G-B)/d + 6) | 60 * ((B-R)/d + 2) | 60 * (A-G)/d | (floats SP)
 
 	; me fijo en que if caigo de los calculos de H
@@ -350,7 +353,172 @@ rgbTOhsl:
 	psrldq xmm0, 12 ; xmm0 = | 0 | 0 | 0 | A | (int 32b)
 	cvtdq2ps xmm0, xmm0 ; xmm0 = | 0 | 0 | 0 | A | (floats SP)
 	por xmm14, xmm0 ; xmm14 = | L | S | H | A |
-    movdqu [rsi], xmm14
+    movdqu [rsi], xmm14 ; [rsi] = | L | S | H | A |
 	;*****
 	pop rbp
 	ret
+
+
+	; void hslTOrgb(float *dst, uint8_t *src)
+	hslTOrgb:
+		push rbp
+		mov rbp, rsp
+		; **********
+	    ; limpio xmm15 para usarlo como registro auxiliar
+	    pxor xmm15, xmm15
+		; limpio xmm14 para ir almacenendo la representacion en HSL
+	    pxor xmm14, xmm14
+
+	    ; cargo el pixel
+	    movd xmm0, [rdi] ; xmm0 = | L | S | H | A | (floats SP)
+
+		; paso L, S y H cada uno a un registro
+		movdqu xmm1, xmm0 ; xmm1 = | L | S | H | A | (floats SP)
+		psrldq xmm1, 12 ; xmm1 = | 0 | 0 | 0 | L | (float SP)
+		movdqu xmm2, xmm0 ; xmm2 = | L | S | H | A | (floats SP)
+		pslldq xmm2, 4
+		psrldq xmm2, 12 ; xmm2 = | 0 | 0 | 0 | S | (float SP)
+		movdqu xmm3, xmm0 ; xmm3 = | L | S | H | A | (floats SP)
+		pslldq xmm3, 8
+		psrldq xmm3, 12 ; xmm2 = | 0 | 0 | 0 | H | (float SP)
+
+		; voy a usar xmm14, 13 y 12 para almacenar c, x y m respectivamente
+
+		; calculo c
+		; multiplico L por 2 y le resto 1
+		movdqu xmm4, xmm1 ; xmm4 = | 0 | 0 | 0 | L | (float SP)
+	    movdqu xmm5, [hsl_first_dword_one] ; xmm5 = | 0.0 | 0.0 | 0.0 | 1.0 |
+	    addps xmm5, xmm5 ; xmm5 = | 0.0 | 0.0 | 0.0 | 2.0 |
+	    mulps xmm4, xmm5 ; xmm4 = | 0 | 0 | 0 | 2*L | (floats SP)
+	    movdqu xmm5, [hsl_first_dword_one] ; xmm5 = | 0.0 | 0.0 | 0.0 | 1.0 |
+	    subps xmm4, xmm5 ; xmm4 = | 0 | 0 | 0 | 2*L - 1 | (floats SP)
+
+		; a lo anterior, le aplico fabs y luego se lo resto a 1
+	    movdqu xmm6, [hsl_fabs_mask] ; xmm6 = | 0x7fffffff | 0x7fffffff | 0x7fffffff | 0x7fffffff |
+	    andps xmm4, xmm6  ; xmm4 = | 0 | 0 | 0 | fabs(2*L - 1) | (floats SP)
+	    subps xmm5, xmm4 ; xmm5 = | 0 | 0 | 0 | 1 - fabs(2*L - 1) | (floats SP)
+
+		; lo multiplico por S
+		mulps xmm5, xmm2 ; xmm5 = | 0 | 0 | 0 | (1 - fabs(2*L - 1)) * S | (floats SP)
+		movdqu xmm14, xmm5 ; xmm14 = | 0 | 0 | 0 | c | (floats SP)
+
+		; calculo x
+		; cargo H y lo divido por 60
+		movdqu xmm4, xmm3 ; xmm4 = | 0 | 0 | 0 | H | (float SP)
+		movdqu xmm6, [hsl_sixty_mask] ; xmm6 = | 60.0 | 60.0 | 60.0 | 60.0 |
+		divps xmm4, xmm6 ; xmm4 = | 0 | 0 | 0 | H/60 | (float SP)
+
+		; calculo fmod(H/60, 2)
+		movdqu xmm5, [hsl_first_dword_one] ; xmm5 = | 0.0 | 0.0 | 0.0 | 1.0 |
+		movdqu xmm7, xmm5 ; xmm7 = | 0.0 | 0.0 | 0.0 | 1.0 |
+		addps xmm5, xmm5 ; xmm5 = | 0.0 | 0.0 | 0.0 | 2.0 |
+		divps xmm4, xmm5 ; xmm4 = | 0.0 | 0.0 | 0.0 | (H/60)/2.0 | (floats SP)
+		movdqu xmm6, xmm4 ; xmm6 = | 0.0 | 0.0 | 0.0 | (H/60)/2.0 | (floats SP)
+		cvttps2dq xmm6, xmm6 ; xmm6 = | 0.0 | 0.0 | 0.0 | int_32((H/60)/2.0) | (ints 32b)
+		cvtdq2ps xmm6, xmm6 ; xmm6 = | 0.0 | 0.0 | 0.0 | parte_entera((H/60)/2.0) | (floats SP)
+		subps xmm4, xmm6 ; xmm4 = | 0.0 | 0.0 | 0.0 | ((H/60)/2.0) - parte_entera((H/60)/2.0) | (floats SP)
+		mulps xmm4, xmm5 ; xmm4  = | 0.0 | 0.0 | 0.0 | fmod(H/60,2.0) | (floats SP)
+
+		; le resto 1 a fmod(H/60, 2)
+		subps xmm4, xmm7 ; xmm4  = | 0.0 | 0.0 | 0.0 | fmod(H/60,2.0) - 1 | (floats SP)
+
+		; aplico fabs a lo que obtuve recien
+		movdqu xmm6, [hsl_fabs_mask] ; xmm6 = | 0x7fffffff | 0x7fffffff | 0x7fffffff | 0x7fffffff |
+	    andps xmm4, xmm6  ; xmm4 = | 0 | 0 | 0 | fabs(fmod(H/60,2.0) - 1) | (floats SP)
+
+		; le resto lo que obtuve a 1
+	    subps xmm7, xmm4 ; xmm5 = | 0 | 0 | 0 | 1 - fabs(fmod(H/60,2.0) - 1) | (floats SP)
+
+		; lo multiplico por c
+		mulps xmm7, xmm14 ; xmm7 = | 0 | 0 | 0 | c*(1 - fabs(fmod(H/60,2.0) - 1)) | (floats SP)
+		movdqu xmm13, xmm7 ; xmm13 = | 0 | 0 | 0 | x | (floats SP)
+
+		; calculo m
+		; cargo c y lo divido por 2
+		movdqu xmm4, xmm14 ; xmm4 = | 0 | 0 | 0 | c | (floats SP)
+		divps xmm4, xmm5 ; xmm4 = | 0 | 0 | 0 | c/2 | (floats SP)
+
+		; le resto lo que obtuve a L
+		movdqu xmm12, xmm1 ; xmm12 = | 0 | 0 | 0 | L | (floats SP)
+		subps xmm12, xmm4 ; xmm4 = | 0 | 0 | 0 | m = L - c/2 | (floats SP)
+
+		; me fijo en que rango está el H para decidir cuales son los valores de R, G y B
+		movd eax, xmm3 ; eax = H
+		; voy a usar xmm9, 10 y 11 para almacenar R, G y B respectivamente
+		.hslTOrgb_h_menor_60:
+		cmp eax, 60
+		jge .hslTOrgb_h_menor_120
+		movdqu xmm9, xmm14 ; R = c
+		movdqu xmm10, xmm13 ; G = x
+		pxor xmm11, xmm11 ; B = 0
+		jmp .hslTOrgb_escalas
+
+		.hslTOrgb_h_menor_120:
+		cmp eax, 120
+		jge .hslTOrgb_h_menor_180
+		movdqu xmm9, xmm13 ; R = x
+		movdqu xmm10, xmm14 ; G = c
+		pxor xmm11, xmm11 ; B = 0
+		jmp .hslTOrgb_escalas
+
+		.hslTOrgb_h_menor_180:
+		cmp eax, 180
+		jge .hslTOrgb_h_menor_240
+		pxor xmm9, xmm9 ; R = 0
+		movdqu xmm10, xmm14 ; G = c
+		movdqu xmm11, xmm13 ; B = x
+		jmp .hslTOrgb_escalas
+
+		.hslTOrgb_h_menor_240:
+		cmp eax, 240
+		jge .hslTOrgb_h_menor_300
+		pxor xmm9, xmm9 ; R = 0
+		movdqu xmm10, xmm13 ; G = x
+		movdqu xmm11, xmm14 ; B = c
+		jmp .hslTOrgb_escalas
+
+		.hslTOrgb_h_menor_300:
+		cmp eax, 300
+		jge .hslTOrgb_h_menor_360
+		movdqu xmm9, xmm13 ; R = x
+		pxor xmm10, xmm10 ; G = 0
+		movdqu xmm11, xmm14 ; B = c
+		jmp .hslTOrgb_escalas
+
+		.hslTOrgb_h_menor_360:
+		movdqu xmm9, xmm14 ; R = c
+		pxor xmm10, xmm10 ; G = 0
+		movdqu xmm11, xmm13 ; B = x
+
+		; calculo la escala de R, G y B
+		.hslTOrgb_escalas:
+		; le sumo a R, G y B  el m calculado
+		addps xmm9, xmm12 ; R = R + m . xmm9 = | 0 | 0 | 0 | R + m | (floats SP)
+		addps xmm10, xmm12 ; G = G + m. xmm10 = | 0 | 0 | 0 | G + m | (floats SP)
+		addps xmm11, xmm12  ; B = B + m. xmm11 = | 0 | 0 | 0 | B + m | (floats SP)
+
+		; junto los tres valores (R, G y B) en un solo registro y los multiplico por 255
+		pslldq xmm9,  12 ;  xmm9 = | R | 0 | 0 | 0 | (floats SP)
+		pslldq xmm10,  8 ;  xmm9 = | 0 | G | 0 | 0 | (floats SP)
+		pslldq xmm11,  12 ;  xmm9 = | 0 | 0 | B | 0 | (floats SP)
+		por xmm9, xmm10
+		por xmm9, xmm11 ;  xmm9 = | R | G | B | 0 | (floats SP)
+		movdqu xmm6, [hsl_mul_255] ; xmm6 = | 255.0 | 255.0 | 255.0 | 255.0 |
+		mulps xmm9, xmm6 ;  xmm9 = | R*255 | G*255 | B*255 | 0 | (floats SP)
+
+		; junto los R,G,B con de Alpha original y paso a enteros de 32 bits
+		cvtps2dq xmm9, xmm9 ;  xmm9 = | R | G | B | 0 | (ints 32b)
+		pslldq xmm0, 12 ; xmm0 = | A | 0 | 0 | 0 | (floats SP)
+		psrldq xmm0, 12 ; xmm0 = | 0 | 0 | 0 | A | (floats SP)
+		cvtps2dq xmm0, xmm0 ; xmm0 = | 0 | 0 | 0 | A | (ints 32b)
+		paddd xmm0, xmm9 ; xmm0 = | R | G | B | A | (int 32b)
+
+		; paso el resultado a enteros de 8 bits
+		packusdw xmm0, xmm15 ; xmm0 = | ceros | R | G | B | A | (int 16b)
+		packuswb xmm0, xmm15 ; xmm0 = | ceros | R | G | B | A | (int 8b)
+
+		; escribo el resultado
+		movd [rsi], xmm0 ; [rsi] = | R | G | B | A |
+		;*****
+		pop rbp
+		ret
