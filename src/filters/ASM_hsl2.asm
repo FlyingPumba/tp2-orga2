@@ -42,6 +42,12 @@ hsl_sub_360: dd 360.0, 0.0, 0.0, 0.0
 
 ; mascaras para hslTOrgb
 hsl_mul_255: dd 255.0, 255.0, 255.0, 255.0
+hsl_const_60: dd 60.0, 0.0, 0.0, 0.0
+hsl_const_120: dd 120.0, 0.0, 0.0, 0.0
+hsl_const_180: dd 180.0, 0.0, 0.0, 0.0
+hsl_const_240: dd 240.0, 0.0, 0.0, 0.0
+hsl_const_300: dd 300.0, 0.0, 0.0, 0.0
+hsl_const_360: dd 360.0, 0.0, 0.0, 0.0
 
 section .data
 
@@ -370,7 +376,7 @@ rgbTOhsl:
 	    pxor xmm14, xmm14
 
 	    ; cargo el pixel
-	    movd xmm0, [rdi] ; xmm0 = | L | S | H | A | (floats SP)
+	    movdqu xmm0, [rdi] ; xmm0 = | L | S | H | A | (floats SP)
 
 		; paso L, S y H cada uno a un registro
 		movdqu xmm1, xmm0 ; xmm1 = | L | S | H | A | (floats SP)
@@ -412,6 +418,8 @@ rgbTOhsl:
 		movdqu xmm5, [hsl_first_dword_one] ; xmm5 = | 0.0 | 0.0 | 0.0 | 1.0 |
 		movdqu xmm7, xmm5 ; xmm7 = | 0.0 | 0.0 | 0.0 | 1.0 |
 		addps xmm5, xmm5 ; xmm5 = | 0.0 | 0.0 | 0.0 | 2.0 |
+		movdqu xmm8, [hsl_first_dword_zero] ; xmm8 = | 1.0 | 1.0 | 1.0 | 0.0 |
+		addps xmm5, xmm8 ; xmm5 = | 1.0 | 1.0 | 1.0 | 2.0 |
 		divps xmm4, xmm5 ; xmm4 = | 0.0 | 0.0 | 0.0 | (H/60)/2.0 | (floats SP)
 		movdqu xmm6, xmm4 ; xmm6 = | 0.0 | 0.0 | 0.0 | (H/60)/2.0 | (floats SP)
 		cvttps2dq xmm6, xmm6 ; xmm6 = | 0.0 | 0.0 | 0.0 | int_32((H/60)/2.0) | (ints 32b)
@@ -443,43 +451,57 @@ rgbTOhsl:
 		subps xmm12, xmm4 ; xmm4 = | 0 | 0 | 0 | m = L - c/2 | (floats SP)
 
 		; me fijo en que rango está el H para decidir cuales son los valores de R, G y B
-		movd eax, xmm3 ; eax = H
 		; voy a usar xmm9, 10 y 11 para almacenar R, G y B respectivamente
 		.hslTOrgb_h_menor_60:
-		cmp eax, 60
-		jge .hslTOrgb_h_menor_120
+		movdqu xmm6, [hsl_const_60] ; xmm6 = | 0.0 | 0.0 | 0.0 | 60.0 |
+		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 60.0 <= H |
+		movd eax, xmm6 ; eax = 60.0 <= H
+		cmp eax, DWORD 0
+		jne .hslTOrgb_h_menor_120 ; salto <=> (60 <= H != FALSE ) <=> (60 <= H == TRUE)
 		movdqu xmm9, xmm14 ; R = c
 		movdqu xmm10, xmm13 ; G = x
 		pxor xmm11, xmm11 ; B = 0
 		jmp .hslTOrgb_escalas
 
 		.hslTOrgb_h_menor_120:
-		cmp eax, 120
-		jge .hslTOrgb_h_menor_180
+		movdqu xmm6, [hsl_const_120] ; xmm6 = | 0.0 | 0.0 | 0.0 | 120.0 |
+		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 120.0 <= H |
+		movd eax, xmm6 ; eax = 120.0 <= H
+		cmp eax, DWORD 0
+		jne .hslTOrgb_h_menor_180 ; salto <=> (120 <= H != FALSE ) <=> (120 <= H == TRUE)
 		movdqu xmm9, xmm13 ; R = x
 		movdqu xmm10, xmm14 ; G = c
 		pxor xmm11, xmm11 ; B = 0
 		jmp .hslTOrgb_escalas
 
 		.hslTOrgb_h_menor_180:
-		cmp eax, 180
-		jge .hslTOrgb_h_menor_240
+		movdqu xmm6, [hsl_const_180] ; xmm6 = | 0.0 | 0.0 | 0.0 | 180.0 |
+		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 180.0 <= H |
+		movd eax, xmm6 ; eax = 180.0 <= H
+		cmp eax, DWORD 0
+		jne .hslTOrgb_h_menor_240 ; salto <=> (180 <= H != FALSE ) <=> (180 <= H == TRUE)
 		pxor xmm9, xmm9 ; R = 0
 		movdqu xmm10, xmm14 ; G = c
 		movdqu xmm11, xmm13 ; B = x
 		jmp .hslTOrgb_escalas
 
 		.hslTOrgb_h_menor_240:
-		cmp eax, 240
-		jge .hslTOrgb_h_menor_300
+		movdqu xmm6, [hsl_const_240] ; xmm6 = | 0.0 | 0.0 | 0.0 | 240.0 |
+		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 240.0 <= H |
+		movd eax, xmm6 ; eax = 240.0 <= H
+		cmp eax, DWORD 0
+		jne .hslTOrgb_h_menor_300 ; salto <=> (240 <= H != FALSE ) <=> (240 <= H == TRUE)
 		pxor xmm9, xmm9 ; R = 0
 		movdqu xmm10, xmm13 ; G = x
 		movdqu xmm11, xmm14 ; B = c
 		jmp .hslTOrgb_escalas
 
 		.hslTOrgb_h_menor_300:
-		cmp eax, 300
-		jge .hslTOrgb_h_menor_360
+		movdqu xmm6, [hsl_const_360] ; xmm6 = | 0.0 | 0.0 | 0.0 | 360.0 |
+		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 360.0 <= H |
+		movd eax, xmm6 ; eax = 360.0 <= H
+		cmp eax, DWORD 0
+		jne .hslTOrgb_h_menor_360 ; salto <=> (360 <= H != FALSE ) <=> (360 <= H == TRUE)
 		movdqu xmm9, xmm13 ; R = x
 		pxor xmm10, xmm10 ; G = 0
 		movdqu xmm11, xmm14 ; B = c
@@ -500,7 +522,7 @@ rgbTOhsl:
 		; junto los tres valores (R, G y B) en un solo registro y los multiplico por 255
 		pslldq xmm9,  12 ;  xmm9 = | R | 0 | 0 | 0 | (floats SP)
 		pslldq xmm10,  8 ;  xmm9 = | 0 | G | 0 | 0 | (floats SP)
-		pslldq xmm11,  12 ;  xmm9 = | 0 | 0 | B | 0 | (floats SP)
+		pslldq xmm11,  4 ;  xmm9 = | 0 | 0 | B | 0 | (floats SP)
 		por xmm9, xmm10
 		por xmm9, xmm11 ;  xmm9 = | R | G | B | 0 | (floats SP)
 		movdqu xmm6, [hsl_mul_255] ; xmm6 = | 255.0 | 255.0 | 255.0 | 255.0 |
