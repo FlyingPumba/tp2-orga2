@@ -100,7 +100,7 @@ ASM_blur1:
 
             ; antes, me fijo si llegue al caso especial del ultimo pixel a procesar
             ; en este caso no puedo levantar asi nomas 128 bits, porque me puedo ir del array
-            lea rax, [r9 - 4]
+            lea rax, [r9 - PIXEL_SIZE]
             cmp rdx, rax
             jne .levantar_pixel_normal
             ; estamos en el ultimo pixel
@@ -117,6 +117,11 @@ ASM_blur1:
             psrldq xmm0, 4 ; xmm0 = | ceros | p2 | p1 | p0 |
             psrldq xmm1, 4 ; xmm1 = | ceros | p5 | p4 | p3 |
             psrldq xmm2, 4 ; xmm2 = | ceros | p8 | p7 | p6 |
+
+            ; antes de empezar a procesar, pongo rsi como si hubieramos levantado un pixel normal
+            ; para que al bajar a memoria la posicion sea correcta
+            lea rsi, [rdi +rdx] ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
+            lea rsi, [rsi + 2*r8] ; rsi = dos filas mas adelante que rdi (una mas que la actual)
             jmp .procesar_pixel
 
             .levantar_pixel_normal:
