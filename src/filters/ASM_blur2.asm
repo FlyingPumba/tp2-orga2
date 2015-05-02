@@ -96,10 +96,25 @@ ASM_blur2:
             movdqu xmm0, [r14 + rdx] ; xmm0 = | p14 | p13 | p12 | p11 |
             movdqu xmm1, [r15 + rdx] ; xmm1 = | p24 | p23 | p22 | p21 |
             movdqu xmm2, [rbx + rsi] ; xmm2 = | p34 | p33 | p32 | p31 |
+
+            lea rax, [r8 - 4*PIXEL_SIZE]
+            cmp rdx, rax
+            jne .levantar_segunda_parte_normal
+            ; si es igual, significa que estamos en las ultimas cuatro columnas
+            movdqu xmm3, xmm0 ; xmm3 = | p14 | p13 | p12 | p11 |
+            movdqu xmm4, xmm1 ; xmm4 = | p24 | p23 | p22 | p21 |
+            movdqu xmm5, xmm2 ; xmm5 = | p34 | p33 | p32 | p31 |
+            psrldq xmm3, 8 ; xmm3 = | 0 | 0 | p14 | p13 |
+            psrldq xmm4, 8 ; xmm4 = | 0 | 0 | p24 | p23 |
+            psrldq xmm5, 8 ; xmm5 = | 0 | 0 | p34 | p33 |
+            jmp .procesar_pixel
+
+            .levantar_segunda_parte_normal:
             movdqu xmm3, [r14 + rdx+ 2*PIXEL_SIZE] ; xmm3 = | p16 | p15 | p14 | p13 |
             movdqu xmm4, [r15 + rdx+ 2*PIXEL_SIZE] ; xmm4 = | p26 | p25 | p24 | p23 |
             movdqu xmm5, [rbx + rsi+ 2*PIXEL_SIZE] ; xmm5 = | p36 | p35 | p34 | p33 |
 
+            .procesar_pixel:
             ; ahora convierto todos los canales de 1 byte a canales de 2 bytes, para realizar las sumas sin romper nada.
             ; entonces, cada pixel va a pasar a medir 8 bytes (64bits) en vez de 4 bytes
 
@@ -110,11 +125,11 @@ ASM_blur2:
             punpckhbw xmm6, xmm15 ; xmm6 = | p14 | p13 | , xmm0 = | p12 | p11 |
 
             movdqu xmm7, xmm1 ; xmm7 = | p24 | p23 | p22 | p21 |
-            punpcklbw xmm1, xmm15 
+            punpcklbw xmm1, xmm15
             punpckhbw xmm7, xmm15 ; xmm7 = | p24 | p23 | , xmm1 = | p22 | p21 |
 
             movdqu xmm8, xmm2 ; xmm8 = | p34 | p33 | p32 | p31 |
-            punpcklbw xmm2, xmm15 
+            punpcklbw xmm2, xmm15
             punpckhbw xmm8, xmm15 ; xmm8 = | p34 | p33 | , xmm2 = | p32 | p31 |
 
             movdqu xmm9, xmm3
