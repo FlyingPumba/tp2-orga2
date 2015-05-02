@@ -71,7 +71,7 @@ ASM_hsl1:
 
 	.ciclo:
 		cmp rbx, r15
-		jg .fin
+		jge .fin
 
 		; paso el pixel actual a HSL
 		mov rdi, rbx ; rdi = *(pixel_actual)
@@ -176,4 +176,3 @@ ASM_hsl1:
 	pop r14
 	pop rbp
 	ret
-  
