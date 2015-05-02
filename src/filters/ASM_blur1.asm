@@ -92,20 +92,43 @@ ASM_blur1:
         .procesar_columna:
         xor rdx, rdx ; contador de columnas (en bytes)
         .ciclo_columna:
-            lea rsi, [rdi +rdx] ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
-            lea rsi, [rsi + 2*r8] ; rsi = dos filas mas adelante que rdi (una mas que la actual)
             ; vamos a cargar una matriz de pixeles, que en memoria se veria:
             ; | p0 | p1 | p2 |
             ; | p3 | p4 | p5 |
             ; | p6 | p7 | p8 |
             ; (los numeros son simplemente indicativos, no indican precedencia)
+
+            ; antes, me fijo si llegue al caso especial del ultimo pixel a procesar
+            ; en este caso no puedo levantar asi nomas 128 bits, porque me puedo ir del array
+            lea rax, [r9 - 4]
+            cmp rdx, rax
+            jne .levantar_pixel_normal
+            ; estamos en el ultimo pixel
+            mov rax, rdx
+            sub rax, PIXEL_SIZE ; rax = contador_columnas - 4 bytes (1 pixel)
+
+            lea rsi, [rdi +rax] ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
+            lea rsi, [rsi + 2*r8] ; rsi = dos filas mas adelante que rdi (una mas que la actual)
+
+            ; posicion del pixel en la columna:  w   w-1  w-2    w-3
+            movdqu xmm0, [r14 + rax] ; xmm0 = | p2 | p1 | p0 | basura |
+            movdqu xmm1, [r15 + rax] ; xmm1 = | p5 | p4 | p3 | basura |
+            movdqu xmm2, [rbx + rsi] ; xmm2 = | p8 | p7 | p6 | basura |
+            psrldq xmm0, 4 ; xmm0 = | ceros | p2 | p1 | p0 |
+            psrldq xmm1, 4 ; xmm1 = | ceros | p5 | p4 | p3 |
+            psrldq xmm2, 4 ; xmm2 = | ceros | p8 | p7 | p6 |
+            jmp .procesar_pixel
+
+            .levantar_pixel_normal:
+            lea rsi, [rdi +rdx] ; rsi = contador_columnas (bytes) + (contador_filas * width * 4)(bytes)
+            lea rsi, [rsi + 2*r8] ; rsi = dos filas mas adelante que rdi (una mas que la actual)
             movdqu xmm0, [r14 + rdx] ; xmm0 = | basura | p2 | p1 | p0 |
             movdqu xmm1, [r15 + rdx] ; xmm1 = | basura | p5 | p4 | p3 |
             movdqu xmm2, [rbx + rsi] ; xmm2 = | basura | p8 | p7 | p6 |
 
+            .procesar_pixel:
             ; ahora convierto todos los canales de 1 byte a canales de 2 bytes, para realizar las sumas sin romper nada.
             ; entonces, cada pixel va a pasar a medir 8 bytes (64bits) en vez de 4 bytes
-
             pxor xmm7, xmm7 ; xmm7 = ceros
             movdqu xmm3, xmm0 ; xmm3 = | basura | p2 | p1 | p0 |
             punpcklbw xmm0, xmm7 ; xmm0 = | p1 | p0 |
@@ -153,7 +176,7 @@ ASM_blur1:
             sub rsi, r8 ; vuelvo a ubicar rsi en la fila del centro de la matriz
             movd [rbx + rsi], xmm0 ; muevo el resultado al centro de la matriz
 
-            add rdx, 4 ; sumo al contador_columna la cantidad de bytes que procese en esta vuelta
+            add rdx, PIXEL_SIZE ; sumo al contador_columna la cantidad de bytes que procese en esta vuelta (1 pixel)
             cmp rdx, r9
             jl .ciclo_columna
 
@@ -162,7 +185,7 @@ ASM_blur1:
             mov rax, r13
             sub rax, 2
 			cmp rcx, rax; Me fijo si termine las filas
-			je .fin
+			jge .fin
 			jmp .ciclo_fila
 
     .fin:
