@@ -497,11 +497,11 @@ rgbTOhsl:
 		jmp .hslTOrgb_escalas
 
 		.hslTOrgb_h_menor_300:
-		movdqu xmm6, [hsl_const_360] ; xmm6 = | 0.0 | 0.0 | 0.0 | 360.0 |
-		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 360.0 <= H |
-		movd eax, xmm6 ; eax = 360.0 <= H
+		movdqu xmm6, [hsl_const_300] ; xmm6 = | 0.0 | 0.0 | 0.0 | 300.0 |
+		cmpleps xmm6, xmm3 ; xmm6 = | basura | basura | basura | 300.0 <= H |
+		movd eax, xmm6 ; eax = 300.0 <= H
 		cmp eax, DWORD 0
-		jne .hslTOrgb_h_menor_360 ; salto <=> (360 <= H != FALSE ) <=> (360 <= H == TRUE)
+		jne .hslTOrgb_h_menor_360 ; salto <=> (300 <= H != FALSE ) <=> (300 <= H == TRUE)
 		movdqu xmm9, xmm13 ; R = x
 		pxor xmm10, xmm10 ; G = 0
 		movdqu xmm11, xmm14 ; B = c
