@@ -40,9 +40,9 @@ int main(void)
 }
 
 
-static const int (*func_blur[3])(uint32_t w, uint32_t h, uint8_t* data) = {C_blur, ASM_blur1, ASM_blur2};
-static const int (*func_merge[3])(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value) = {C_merge, ASM_merge1, ASM_merge2};
-static const int (*func_hsl[3])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1, ASM_hsl2};
+static const void (*func_blur[3])(uint32_t w, uint32_t h, uint8_t* data) = {C_blur, ASM_blur1, ASM_blur2};
+static const void (*func_merge[3])(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value) = {C_merge, ASM_merge1, ASM_merge2};
+static const void (*func_hsl[3])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1, ASM_hsl2};
 
 void execute_exp(char* path, char* image_name, FILE *file)
 {
