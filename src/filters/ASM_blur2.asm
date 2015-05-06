@@ -212,7 +212,7 @@ ASM_blur2:
             jge .ultimas_columnas
             movdqu [rbx + rsi], xmm0 ; muevo | pixel4 | pixel3 | pixel2 | pixel1 | a la matriz
             jmp .ciclo_columna
-            .ultimas_columnas
+            .ultimas_columnas:
             movq [rbx + rsi], xmm0 ; muevo | pixel2 | pixel1 | a la matriz
 
             inc rcx	; Incremento el contador de filas

@@ -7,11 +7,12 @@
 
 all: makes exe
 
-CFLAGS=-Wall -Wextra -pedantic -O0 -ggdb -lm -std=c99
+CFLAGS=-w -O0 -ggdb -lm -std=c99
+#-Wall -Wextra -pedantic
 
 makes:
-	make -C ../bmp
-	make -C ../filters
+	make --silent -C ../bmp
+	make --silent -C ../filters
 
 %.o: %.c rdtsc.h
 	gcc $(CFLAGS) -c -o $@ $<
@@ -21,6 +22,6 @@ exe: rdtsc.h experimentos.c makes
 	cp exe ../../bin/
 	
 clean:
-	make -C ../bmp clean
-	make -C ../filters clean
+	make --silent -C ../bmp clean
+	make --silent -C ../filters clean
 	rm  -f *.o exe
