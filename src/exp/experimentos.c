@@ -30,7 +30,7 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 int main(void)
 {
   FILE *file = fopen("datos.dat", "w+");
-  fprintf(file, "img w h c_blur asm1_blur asm2_blur asm3_blur c_merge asm1_merge asm2_merge asm3_merge c_hsl asm1_hsl asm2_hsl\n");
+  fprintf(file, "img w h tam cblur asm1blur asm2blur asm3blur cmerge asm1merge asm2merge asm3merge chsl asm1hsl asm2hsl\n");
   DIR *d;
   struct dirent *dir;
   d = opendir(files_path);
@@ -142,7 +142,7 @@ void execute_exp(BMP* img, unsigned long* res)
 
 void print_results(FILE* file, unsigned long* res, char* image_name, int w, int h)
 {
-  fprintf(file, "%s %d %d ", image_name, w, h);
+  fprintf(file, "%s %d %d %d ", image_name, w, h, w*h);
   for(int i=0;i<func_size;i++) {  
     fprintf(file, "%ld ", res[i]);
   }
