@@ -1,0 +1,11 @@
+// Codigo
+rstsc
+cpuid
+cli
+sti
+
+// Ubuntu
+cpu freq
+taskset --cpu-list 1 my_command 
+/boot/grub/grub.conf /etc/default/grub -> isolcpus
+/etc/default/irqbalance -> IRQBALANCE_BANNED_CPUS
