@@ -56,7 +56,7 @@ int main(void)
         unsigned long res[func_size];
         for (int i=0; i<func_size; i++){
           res[i] = 0;
-          for (int j=0; j<func_size; j++){
+          for (int j=0; j<10; j++){
             res[i] += tiempos[i][j+10];
           }
           res[i] = res[i]/10;
