@@ -85,6 +85,7 @@ int read_options(int argc, char* argv[], options* opt) {
   if(!strcmp(argv[1],"c")||!strcmp(argv[1],"C")) {opt->c_asm = 0;}
   else if(!strcmp(argv[1],"a1")||!strcmp(argv[1],"asm1")||!strcmp(argv[1],"ASM1")) {opt->c_asm = 1;}
   else if(!strcmp(argv[1],"a2")||!strcmp(argv[1],"asm2")||!strcmp(argv[1],"ASM2")) {opt->c_asm = 2;}
+  else if(!strcmp(argv[1],"a3")||!strcmp(argv[1],"asm3")||!strcmp(argv[1],"ASM3")) {opt->c_asm = 3;}
   else {opt->help = 1; return 1;}
   if(argc<2) {opt->help = 1; return 1;}
   opt->filter = argv[2];

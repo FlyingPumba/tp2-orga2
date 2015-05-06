@@ -69,6 +69,7 @@ int run_merge(int c, char* src1, char* src2, char* dst, float value){
   if(c==0)         C_merge(w1,h1,data1C,data2C,value);
   else if(c==1) ASM_merge1(w1,h1,data1C,data2C,value);
   else if(c==2) ASM_merge2(w1,h1,data1C,data2C,value);
+  else if(c==3) ASM_merge3(w1,h1,data1C,data2C,value);
   else {return -1;}
   
   if(*(bmp_get_bitcount(bmp1)) == 24) {
