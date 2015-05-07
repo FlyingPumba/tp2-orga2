@@ -47,22 +47,22 @@ ASM_merge2:
   ; empaqueto value*2^k
   movdqu xmm1, xmm4 ; xmm1 = xmm4 = value * 2^k (int 32b)
   pslldq xmm1, 4 ; xmm1 = | ceros .. value*2^k ceros (4 bytes) |
-  addps xmm4, xmm1 ; xmm0 = | ceros .. value*2^k value*2^k |
+  paddd xmm4, xmm1 ; xmm0 = | ceros .. value*2^k value*2^k |
   movdqu xmm1, xmm4 ; xmm1 = xmm4
   pslldq xmm1, 8 ; xmm1 = | value*2^k value*2^k ceros .. |
-  addps xmm4, xmm1 ; xmm4 = | value*2^k | value*2^k | value*2^k | value*2^k |
+  paddd xmm4, xmm1 ; xmm4 = | value*2^k | value*2^k | value*2^k | value*2^k |
 
   ; empaqueto 2^k
   movdqu xmm2, xmm3 ; xmm2 = xmm3 = 2^k (int 32b)
   pslldq xmm2, 4 ; xmm2 = | ceros .. 2^k ceros (4 bytes) |
-  addps xmm3, xmm2 ; xmm3 = | ceros .. 2^k 2^k |
+  paddd xmm3, xmm2 ; xmm3 = | ceros .. 2^k 2^k |
   movdqu xmm2, xmm3 ; xmm2 = xmm3
   pslldq xmm2, 8 ; xmm2 = | 2^k 2^k ceros .. |
-  addps xmm3, xmm2 ; xmm3 = | 2^k | 2^k | 2^k | 2^k |
+  paddd xmm3, xmm2 ; xmm3 = | 2^k | 2^k | 2^k | 2^k |
 
   ; preparo un registro con (1-value)*2^k empaquetado
   movdqu xmm15, xmm3
-  subpd xmm15, xmm4 ; xmm15 = | (1-value)*2^k | (1-value)*2^k | (1-value)*2^k | (1-value)*2^k |
+  psubd xmm15, xmm4 ; xmm15 = | (1-value)*2^k | (1-value)*2^k | (1-value)*2^k | (1-value)*2^k |
 
   ; muevo el empaquetado de value*2^k a uno de los ultimos registros
   movdqu xmm14, xmm4 ; xmm14 = | value*2^k | value*2^k | value*2^k | value*2^k |
