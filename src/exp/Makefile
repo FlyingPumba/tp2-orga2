@@ -16,11 +16,15 @@ makes:
 
 %.o: %.c rdtsc.h
 	gcc $(CFLAGS) -c -o $@ $<
-	
+
 exe: rdtsc.h experimentos.c makes
 	gcc $(CFLAGS) experimentos.c rdtsc.h ../filters/*.o ../bmp/*.o -o exe -lm
 	cp exe ../../bin/
-	
+
+blur: rdtsc.h exp_blur.c makes
+		gcc $(CFLAGS) exp_blur.c rdtsc.h ../filters/*.o ../bmp/*.o -o exp_blur -lm
+		cp exp_blur ../../bin/
+
 clean:
 	make --silent -C ../bmp clean
 	make --silent -C ../filters clean
