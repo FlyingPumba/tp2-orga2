@@ -25,7 +25,7 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 
 int main(void)
 {
-  FILE *file = fopen("datos.dat", "w+");
+  FILE *file = fopen("datos_blur.dat", "w+");
   fprintf(file, "img w h tam cblur asm1blur asm2blur expcblur1 expcblur2 expasm3\n");
   DIR *d;
   struct dirent *dir;
