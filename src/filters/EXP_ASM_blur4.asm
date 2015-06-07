@@ -5,8 +5,8 @@
 ;                                                                           ;
 ; ************************************************************************* ;
 
-; void ASM_blur3( uint32_t w, uint32_t h, uint8_t* data )
-global ASM_blur3
+; void EXP_ASM_blur4( uint32_t w, uint32_t h, uint8_t* data )
+global EXP_ASM_blur4
 extern malloc
 extern free
 
@@ -23,7 +23,7 @@ section .rodata
     unpckh8a16: db 0x08, 0xFF, 0x09, 0xFF, 0x0A, 0xFF, 0x0B, 0xFF, 0x0C, 0xFF, 0x0D, 0xFF, 0x0E, 0xFF, 0x0F, 0xFF
 
 section .text
-ASM_blur3:
+EXP_ASM_blur4:
     push rbp
     mov rbp, rsp
     sub rsp, 8
