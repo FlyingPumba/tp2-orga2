@@ -118,6 +118,14 @@ void execute_exp(BMP* img, unsigned long* res)
 
 void print_results(FILE* file, unsigned long* res, char* image_name, int w, int h)
 {
+    // calculo el tipo
+    int tipo = -1;
+
+    const char s[2] = ".";
+    char *token;
+    /* get the first token */
+    strtok(image_name, s);
+
   fprintf(file, "%s %d %d %d ", image_name, w, h, w*h);
   for(int i=0;i<func_size;i++) {
     fprintf(file, "%ld ", res[i]);
