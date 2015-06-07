@@ -11,11 +11,11 @@
 #include "../filters/filters.h"
 #include "rdtsc.h"
 
-#define func_blur_size 6
-#define func_size 6
+#define func_blur_size 7
+#define func_size 7
 
 static const char* files_path = "img/";
-static const void (*func_blur[func_blur_size])(uint32_t w, uint32_t h, uint8_t* data) = {C_blur, ASM_blur1, ASM_blur2, EXP_C_blur1, EXP_C_blur2, EXP_ASM_blur3};
+static const void (*func_blur[func_blur_size])(uint32_t w, uint32_t h, uint8_t* data) = {C_blur, ASM_blur1, ASM_blur2, EXP_C_blur1, EXP_C_blur2, EXP_C_blur3, EXP_ASM_blur3};
 
 void execute_exp(BMP*, unsigned long*);
 void print_results(FILE*, unsigned long*, char*, int, int);
@@ -26,7 +26,7 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 int main(void)
 {
   FILE *file = fopen("datos_blur.dat", "w+");
-  fprintf(file, "img w h tam cblur asm1blur asm2blur expcblur1 expcblur2 expasm3\n");
+  fprintf(file, "img w h tam cblur asm1blur asm2blur expcblur1 expcblur2 expcblur3 expasm3\n");
   DIR *d;
   struct dirent *dir;
   d = opendir(files_path);

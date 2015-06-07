@@ -38,6 +38,7 @@ void ASM_blur2(uint32_t w, uint32_t h, uint8_t* data);
 void ASM_blur3(uint32_t w, uint32_t h, uint8_t* data);
 void EXP_C_blur1(uint32_t w, uint32_t h, uint8_t* data);
 void EXP_C_blur2(uint32_t w, uint32_t h, uint8_t* data);
+void EXP_C_blur3(uint32_t w, uint32_t h, uint8_t* data);
 void EXP_ASM_blur3(uint32_t w, uint32_t h, uint8_t* data);
 
 void    C_merge(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
