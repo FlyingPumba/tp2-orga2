@@ -48,9 +48,8 @@ ASM_hsl1:
 	; Variables en la pila:
 	;
 	; hsl_temp_dato: [rsp]
-	; hsl_suma_dato: [rsp+16]
-	; hsl_params_dato: [rsp+32]
-	; rgb_result: [rsp+48]
+	; hsl_params_dato: [rsp+16]
+	; hsl_suma_dato: [rsp+32]
 	;
 
 	mov rbx, rdx ; rbx = *data (aumenta en cada ciclo)
@@ -72,10 +71,9 @@ ASM_hsl1:
 
 	pxor xmm0, xmm0 ; xmm0 = zeros
 	xor eax, eax ; eax = 0
-	movdqu [rsp], xmm0 ; hsl_temp_dato: [rsp] = zeros(float)
-	movdqu [rsp+16], xmm0 ; hsl_suma_dato: [rsp+16] = zeros(float)
-	movdqu [rsp+32], xmm4 ; hsl_params_dato: [rsp+32] = |0.0|HH|SS|LL|
-	mov dword [rsp+48], eax ; rgb_result: [rsp+48] = zeros(byte)
+	movaps [rsp], xmm0 ; hsl_temp_dato: [rsp] = zeros(float)
+	movaps [rsp+16], xmm4 ; hsl_params_dato: [rsp+16] = |0.0|HH|SS|LL|
+	movaps [rsp+32], xmm0 ; hsl_suma_dato: [rsp+32] = zeros(float)
 
 	.ciclo:
 		cmp rbx, r15
@@ -87,34 +85,29 @@ ASM_hsl1:
 		call rgbTOhsl ; [rsp] = |a|h|s|l|
 
 		; preparo los datos de la suma
-		movdqu xmm0, [rsp] ; xmm0 = |l|s|h|a|
-		movdqu xmm1, [rsp+32] ; xmm1 = |LL|SS|HH|0.0|
+		movaps xmm0, [rsp] ; xmm0 = |l|s|h|a|
+		movaps xmm1, [rsp+16] ; xmm1 = |LL|SS|HH|0.0|
 
 		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
 
-		; uso xmm3 para comparar y fixear el HUE resultante
-		pxor xmm3, xmm3
-		mov eax, __float32__(360.0)
-		movd xmm3, eax ; xmm3 = |0.0|0.0|0.0|360.0|
-
-		movdqu xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal para guardar el valor original de xmm0)
-		movdqu xmm5, xmm0 ; xmm5 = |l+LL|s+SS|h+HH|a| (donde guardo el dato)
+		movaps xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal para guardar el valor original de xmm0)
+		movaps xmm5, xmm0 ; xmm5 = |l+LL|s+SS|h+HH|a| (donde guardo el dato)
 
 		.check:
 
 			pxor xmm1, xmm1; xmm1 = |0.0|0.0|0.0|0.0|
 			maxps xmm5, xmm1; xmm5 = |max(l+LL,0.0)|max(s+SS,0.0)|max(h+HH,0.0)|max(a,0.0)| = |l2|s2|h2|a2|
 
-			movdqu xmm1, [hsl_max_dato]; xmm1 = |1.0|1.0|360.0|1.0|
+			movups xmm1, [hsl_max_dato]; xmm1 = |1.0|1.0|360.0|1.0|
 			minps xmm5, xmm1; xmm5 = |min(l2,1.0)|min(s2,1.0)|min(h2,360.0)|min(a2,1.0)| = |l3|s3|h3|a3|
-
-			pslldq xmm3, 4; xmm3 = |0.0|0.0|360.0|0.0|
 
 		.check_max:
 
-			psrldq xmm0, 4; xmm0 = |basura...|h+HH|
 			psrldq xmm1, 4; xmm1 = |basura...|360.0|
+			psrldq xmm0, 4; xmm0 = |basura...|h+HH|
+			movaps xmm6, xmm0; xmm6 = |basura...|h+HH|
+
 			cmpltss xmm0, xmm1 ; xmm0 = |basura...|h+HH < max_h| (bool)
 			movd edi, xmm0 ; edi = h+HH < max_h
 
@@ -122,38 +115,40 @@ ASM_hsl1:
 			jne .check_min
 
 			; caso h+HH >= max_h
-			movdqu xmm0, xmm2; xmm0 = |l+LL|s+SS|h+HH|a|
-			subps xmm0, xmm3 ; xmm0[1] = h+HH-360.0
-			insertps xmm5, xmm0, 0x50 ; xmm5[1] = h+HH-360.0
-			jmp .fin_ciclo
+			subss xmm6, xmm1 ; xmm6[0] = h+HH-360.0 = h_valido
+			jmp .save_a
 
 		.check_min:
 
-			movdqu xmm0, xmm2; xmm0 = |l+LL|s+SS|h+HH|a|
-			pxor xmm1, xmm1; xmm1 = |0.0|0.0|0.0|0.0|
-			psrldq xmm0, 4; xmm0 = |basura...|h+HH|
-			cmpnltss xmm0, xmm1 ; xmm0 = |basura...|h+HH >= 0.0| (bool)
+			movaps xmm0, xmm6; xmm0 = |basura...|h+HH|
+			pxor xmm3, xmm3; xmm3 = |0.0|0.0|0.0|0.0|
+
+			cmpnltss xmm0, xmm3 ; xmm0 = |basura...|h+HH >= 0.0| (bool)
 			movd edi, xmm0; edi = h+HH >= 0.0
 
 			cmp edi, FALSE
-			jne .fin_ciclo
+			jne .save_b
 
 			; caso h+HH < 0.0
-			addps xmm2, xmm3 ; xmm2[1] = h+HH+360.0
-			insertps xmm5, xmm2, 0x50 ; xmm5[1] = h+HH+360.0
+			addss xmm6, xmm1 ; xmm6[0] = h+HH+360.0 = h_valido
+
+		.save_a:
+
+		insertps xmm5, xmm6, 0x10
+		movaps [rsp+32], xmm5 ; [rsp+32] = |a_valido|h_invalido|s_valido|l_valido|
+		;movd [rsp+36], xmm6 ; [rsp+32] = |a_valido|h_valido|s_valido|l_valido|
+		jmp .fin_ciclo
+
+		.save_b:
+
+		movaps [rsp+32], xmm5 ; [rsp+32] = |a_valido|h_valido|s_valido|l_valido|
 
 		.fin_ciclo:
 
-		movdqu [rsp+16], xmm5
-
 		;hago la conversion de HSL a RGB
-		lea rdi, [rsp+16] ; *rdi = |a_valido|h_valido|s_valido|l_valido|
-		lea rsi, [rsp+48] ; *rsi = |X|X|X|X|
-		call hslTOrgb ; *rsp+48 = |a_final|r_final|g_final|b_final|
-
-		;asigno la conversion a la matriz
-		mov dword esi, [rsp+48] ; esi = |a_final|r_final|g_final|b_final|
-		mov dword [rbx], esi ; [pixel_actual] = |a_final|r_final|g_final|b_final|
+		lea rdi, [rsp+32] ; *rdi = |a_valido|h_valido|s_valido|l_valido|
+		mov rsi, rbx ; rsi = rbx
+		call hslTOrgb ; *rbx = |a_final|r_final|g_final|b_final|
 
 		;incremento el puntero para ir al proximo pixel
 		add rbx, RGB_PIXEL_SIZE ; rbx = *(proximo_pixel)
