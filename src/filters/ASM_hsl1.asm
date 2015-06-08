@@ -92,81 +92,59 @@ ASM_hsl1:
 
 		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-		movdqu xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (float)
-
-		; pongo la respuesta en [rsp+16], aca voy a mantener el dato respuesta
-		movdqu [rsp+16], xmm0 ; [rsp+16] = |a|h+HH|s+SS|l+LL| (float)
 
 		; uso xmm3 para comparar y fixear el HUE resultante
+		pxor xmm3, xmm3
 		mov eax, __float32__(360.0)
-		movd xmm3, eax
-		pslldq xmm3, 12
-		psrldq xmm3, 8
+		movd xmm3, eax ; xmm3 = |0.0|0.0|0.0|360.0|
+
+		movdqu xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal para guardar el valor original de xmm0)
+		movdqu xmm5, xmm0 ; xmm5 = |l+LL|s+SS|h+HH|a| (donde guardo el dato)
+
+		.check:
+
+			pxor xmm1, xmm1; xmm1 = |0.0|0.0|0.0|0.0|
+			maxps xmm5, xmm1; xmm5 = |max(l+LL,0.0)|max(s+SS,0.0)|max(h+HH,0.0)|max(a,0.0)| = |l2|s2|h2|a2|
+
+			movdqu xmm1, [hsl_max_dato]; xmm1 = |1.0|1.0|360.0|1.0|
+			minps xmm5, xmm1; xmm5 = |min(l2,1.0)|min(s2,1.0)|min(h2,360.0)|min(a2,1.0)| = |l3|s3|h3|a3|
+
+			pslldq xmm3, 4; xmm3 = |0.0|0.0|360.0|0.0|
 
 		.check_max:
 
-			movdqu xmm1, [hsl_max_dato]
-			cmpltps xmm0, xmm1 ; xmm0 = |l < max_l|s < max_s|h < max_h|a < max_a| (bool)
-			
-			movdqu xmm4, xmm0
-			psrldq xmm4, 4
-			movd edi, xmm4 ; edi = h < max_h
-			psrldq xmm4, 4
-			movd esi, xmm4 ; esi = s < max_s
-			psrldq xmm4, 4
-			movd edx, xmm4 ; edx = l < max_l
+			psrldq xmm0, 4; xmm0 = |basura...|h+HH|
+			psrldq xmm1, 4; xmm1 = |basura...|360.0|
+			cmpltss xmm0, xmm1 ; xmm0 = |basura...|h+HH < max_h| (bool)
+			movd edi, xmm0 ; edi = h+HH < max_h
 
-			.check_max_hue:
 			cmp edi, FALSE
-			jne .check_max_sat ; if ( (h < max_h) == false )
-			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-			subps xmm0, xmm3 ; xmm0 = |l+LL|s+SS|h+HH-360|a| (float)
-			movdqu [rsp+16], xmm0 ; [rsp+16] = |a|h+HH-360|s+SS|l+LL|
+			jne .check_min
 
-			.check_max_sat:
-			cmp esi, FALSE
-			jne .check_max_lum ; if ( (s < max_s) == false )
-			mov dword [rsp+16+HSL_OFFSET_SAT], __float32__(1.0) ; s = max_s
-
-			.check_max_lum:
-			cmp edx, FALSE
-			jne .check_min ; if ( (l < max_l) == false )
-			mov dword [rsp+16+HSL_OFFSET_LUM], __float32__(1.0) ; l = max_l
+			; caso h+HH >= max_h
+			movdqu xmm0, xmm2; xmm0 = |l+LL|s+SS|h+HH|a|
+			subps xmm0, xmm3 ; xmm0[1] = h+HH-360.0
+			insertps xmm5, xmm0, 0x50 ; xmm5[1] = h+HH-360.0
+			jmp .fin_ciclo
 
 		.check_min:
 
-			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-			pxor xmm1, xmm1
-			cmpnltps xmm0, xmm1 ; xmm0 = |l >= 0.0|s >= 0.0|h >= 0.0|a >= 0.0| (bool)
+			movdqu xmm0, xmm2; xmm0 = |l+LL|s+SS|h+HH|a|
+			pxor xmm1, xmm1; xmm1 = |0.0|0.0|0.0|0.0|
+			psrldq xmm0, 4; xmm0 = |basura...|h+HH|
+			cmpnltss xmm0, xmm1 ; xmm0 = |basura...|h+HH >= 0.0| (bool)
+			movd edi, xmm0; edi = h+HH >= 0.0
 
-			movdqu xmm4, xmm0
-			psrldq xmm4, 4
-			movd edi, xmm4 ; edi = h >= 0.0
-			psrldq xmm4, 4
-			movd esi, xmm4 ; esi = s >= 0.0
-			psrldq xmm4, 4
-			movd edx, xmm4 ; edx = l >= 0.0
-
-			.check_min_hue:
 			cmp edi, FALSE
-			jne .check_min_sat ; if ( (h >= min_h) == false )
-			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-			addps xmm0, xmm3 ; xmm0 = |l+LL|s+SS|h+HH+360|a| (float)
-			movdqu [rsp], xmm0 ; [rsp] = |a|h+HH+360|s+SS|l+LL|
-			mov dword r14d, [rsp+HSL_OFFSET_HUE] ; r14d = h+HH+360
-			mov dword [rsp+16+HSL_OFFSET_HUE], r14d ; h+HH+360 ; obs: no puedo sobreescribir todo
+			jne .fin_ciclo
 
-			.check_min_sat:
-			cmp esi, FALSE
-			jne .check_min_lum ; if ( (s >= min_s) == false )
-			mov dword [rsp+16+HSL_OFFSET_SAT], __float32__(0.0) ; s = min_s
-
-			.check_min_lum:
-			cmp edx, FALSE
-			jne .fin_ciclo ; if ( (l >= min_l) == false )
-			mov dword [rsp+16+HSL_OFFSET_LUM], __float32__(0.0) ; l = min_l
+			; caso h+HH < 0.0
+			addps xmm2, xmm3 ; xmm2[1] = h+HH+360.0
+			insertps xmm5, xmm2, 0x50 ; xmm5[1] = h+HH+360.0
 
 		.fin_ciclo:
+
+		movdqu [rsp+16], xmm5
 
 		;hago la conversion de HSL a RGB
 		lea rdi, [rsp+16] ; *rdi = |a_valido|h_valido|s_valido|l_valido|
