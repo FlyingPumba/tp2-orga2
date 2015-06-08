@@ -32,10 +32,6 @@ hsl_max_dato: dd 1.0, 360.0, 1.0, 1.0 ; |max_a|max_h|max_s|max_l|
 hsl_min_dato: dd 0.0, 0.0, 0.0, 0.0 ; |0.0|0.0|0.0|0.0|
 hsl_fix_dato: dd 0.0, 360.0, 0.0, 0.0 ; |0.0|360.0|0.0|0.0|
 
-;zeros
-hsl_zero_4_float: dd 0.0, 0.0, 0.0, 0.0
-hsl_zero_4_byte: db 0, 0, 0, 0
-
 section .text
 
 ASM_hsl1:
@@ -74,8 +70,8 @@ ASM_hsl1:
 	add rax, rbx ; rax = *data.end()
 	mov r15, rax ; r15 = *data.end()
 
-	movdqu xmm0, [hsl_zero_4_float]
-	mov dword eax, [hsl_zero_4_byte]
+	pxor xmm0, xmm0 ; xmm0 = zeros
+	xor eax, eax ; eax = 0
 	movdqu [rsp], xmm0 ; hsl_temp_dato: [rsp] = zeros(float)
 	movdqu [rsp+16], xmm0 ; hsl_suma_dato: [rsp+16] = zeros(float)
 	movdqu [rsp+32], xmm4 ; hsl_params_dato: [rsp+32] = |0.0|HH|SS|LL|
@@ -102,17 +98,23 @@ ASM_hsl1:
 		movdqu [rsp+16], xmm0 ; [rsp+16] = |a|h+HH|s+SS|l+LL| (float)
 
 		; uso xmm3 para comparar y fixear el HUE resultante
-		movdqu xmm3, [hsl_fix_dato] ; xmm0 = |0.0|0.0|360.0|0.0| (float)
+		mov eax, __float32__(360.0)
+		movd xmm3, eax
+		pslldq xmm3, 12
+		psrldq xmm3, 8
 
 		.check_max:
 
 			movdqu xmm1, [hsl_max_dato]
 			cmpltps xmm0, xmm1 ; xmm0 = |l < max_l|s < max_s|h < max_h|a < max_a| (bool)
-			movdqu [rsp], xmm0 ; [rsp] = |a < max_a|h < max_h|s < max_s|l < max_l| (bool)
-
-			mov dword edi, [rsp+HSL_OFFSET_HUE] ; edi = h < max_h
-			mov dword esi, [rsp+HSL_OFFSET_SAT] ; esi = s < max_s
-			mov dword edx, [rsp+HSL_OFFSET_LUM] ; edx = l < max_l
+			
+			movdqu xmm4, xmm0
+			psrldq xmm4, 4
+			movd edi, xmm4 ; edi = h < max_h
+			psrldq xmm4, 4
+			movd esi, xmm4 ; esi = s < max_s
+			psrldq xmm4, 4
+			movd edx, xmm4 ; edx = l < max_l
 
 			.check_max_hue:
 			cmp edi, FALSE
@@ -124,25 +126,26 @@ ASM_hsl1:
 			.check_max_sat:
 			cmp esi, FALSE
 			jne .check_max_lum ; if ( (s < max_s) == false )
-			mov dword r14d, [hsl_max_dato+HSL_OFFSET_SAT]
-			mov dword [rsp+16+HSL_OFFSET_SAT], r14d ; s = max_s
+			mov dword [rsp+16+HSL_OFFSET_SAT], __float32__(1.0) ; s = max_s
 
 			.check_max_lum:
 			cmp edx, FALSE
 			jne .check_min ; if ( (l < max_l) == false )
-			mov dword r14d, [hsl_max_dato+HSL_OFFSET_LUM]
-			mov dword [rsp+16+HSL_OFFSET_LUM], r14d ; l = max_l
+			mov dword [rsp+16+HSL_OFFSET_LUM], __float32__(1.0) ; l = max_l
 
 		.check_min:
 
 			movdqu xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-			movdqu xmm1, [hsl_min_dato]
+			pxor xmm1, xmm1
 			cmpnltps xmm0, xmm1 ; xmm0 = |l >= 0.0|s >= 0.0|h >= 0.0|a >= 0.0| (bool)
-			movdqu [rsp], xmm0 ; [rsp] = |a > 0.0|h > 0.0|s > 0.0|l > 0.0| (bool)
 
-			mov dword edi, [rsp+HSL_OFFSET_HUE] ; edi = h >= 0.0
-			mov dword esi, [rsp+HSL_OFFSET_SAT] ; esi = s >= 0.0
-			mov dword edx, [rsp+HSL_OFFSET_LUM] ; edx = l >= 0.0
+			movdqu xmm4, xmm0
+			psrldq xmm4, 4
+			movd edi, xmm4 ; edi = h >= 0.0
+			psrldq xmm4, 4
+			movd esi, xmm4 ; esi = s >= 0.0
+			psrldq xmm4, 4
+			movd edx, xmm4 ; edx = l >= 0.0
 
 			.check_min_hue:
 			cmp edi, FALSE
@@ -156,14 +159,12 @@ ASM_hsl1:
 			.check_min_sat:
 			cmp esi, FALSE
 			jne .check_min_lum ; if ( (s >= min_s) == false )
-			mov dword r14d, [hsl_min_dato+HSL_OFFSET_SAT]
-			mov dword [rsp+16+HSL_OFFSET_SAT], r14d ; s = min_s
+			mov dword [rsp+16+HSL_OFFSET_SAT], __float32__(0.0) ; s = min_s
 
 			.check_min_lum:
 			cmp edx, FALSE
 			jne .fin_ciclo ; if ( (l >= min_l) == false )
-			mov dword r14d, [hsl_min_dato+HSL_OFFSET_LUM]
-			mov dword [rsp+16+HSL_OFFSET_LUM], r14d ; l = min_l
+			mov dword [rsp+16+HSL_OFFSET_LUM], __float32__(0.0) ; l = min_l
 
 		.fin_ciclo:
 
@@ -177,7 +178,7 @@ ASM_hsl1:
 		mov dword [rbx], esi ; [pixel_actual] = |a_final|r_final|g_final|b_final|
 
 		;incremento el puntero para ir al proximo pixel
-		lea rbx, [rbx + RGB_PIXEL_SIZE] ; lea = *(proximo_pixel)
+		add rbx, RGB_PIXEL_SIZE ; rbx = *(proximo_pixel)
 		jmp .ciclo
 
 	.fin:
