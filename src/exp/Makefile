@@ -25,6 +25,10 @@ blur: rdtsc.h exp_blur.c makes
 		gcc $(CFLAGS) exp_blur.c rdtsc.h ../filters/*.o ../bmp/*.o -o exp_blur -lm
 		cp exp_blur ../../bin/
 
+hsl: rdtsc.h exp_hsl.c makes
+		gcc $(CFLAGS) exp_hsl.c rdtsc.h ../filters/*.o ../bmp/*.o -o exp_hsl -lm
+		cp exp_hsl ../../bin/
+
 clean:
 	make --silent -C ../bmp clean
 	make --silent -C ../filters clean

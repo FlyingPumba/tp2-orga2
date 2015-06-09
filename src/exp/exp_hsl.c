@@ -11,14 +11,10 @@
 #include "../filters/filters.h"
 #include "rdtsc.h"
 
-#define func_blur_size 3
-#define func_merge_size 4
 #define func_hsl_size 3
-#define func_size 10
+#define func_size 3
 
 static const char* files_path = "img/";
-static const void (*func_blur[func_blur_size])(uint32_t w, uint32_t h, uint8_t* data) = {C_blur, ASM_blur1, ASM_blur2};
-static const void (*func_merge[func_merge_size])(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value) = {C_merge, ASM_merge1, ASM_merge2, ASM_merge3};
 static const void (*func_hsl[func_hsl_size])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1, ASM_hsl2};
 
 void execute_exp(BMP*, unsigned long*);
@@ -29,8 +25,8 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 
 int main(void)
 {
-  FILE *file = fopen("datos.dat", "w+");
-  fprintf(file, "img w h tam cblur asm1blur asm2blur asm3blur cmerge asm1merge asm2merge asm3merge chsl asm1hsl asm2hsl\n");
+  FILE *file = fopen("datos_hsl.dat", "w+");
+  fprintf(file, "img w h tam chsl asm1hsl asm2hsl\n");
   DIR *d;
   struct dirent *dir;
   d = opendir(files_path);
@@ -98,34 +94,14 @@ void execute_exp(BMP* img, unsigned long* res)
   
   // Tests ------------------------------------------
 
-  // Blur
-  for (int i=0; i<func_blur_size; i++){
-    serialize();
-    unsigned long start, end;
-    RDTSC_START(start);
-    (*func_blur[i])(w,h,data1s[i]);
-    RDTSC_STOP(end);
-    res[i] = end - start;
-  }
-
-  // Merge
-  for (int i=0; i<func_merge_size; i++){
-    serialize();
-    unsigned long start, end;
-    RDTSC_START(start);
-    (*func_merge[i])(w,h,data1s[i+func_blur_size],data2s[i+func_blur_size],0.5);
-    RDTSC_STOP(end);
-    res[i+func_blur_size] = end - start;
-  }
-
   // Hsl
   for (int i=0; i<func_hsl_size; i++){
     serialize();
     unsigned long start, end;
     RDTSC_START(start);
-    (*func_hsl[i])(w,h,data1s[i+func_blur_size+func_merge_size], 30.0, 0.1, 0.1);
+    (*func_hsl[i])(w,h,data1s[i], 30.0, 0.1, 0.1);
     RDTSC_STOP(end);
-    res[i+func_blur_size+func_merge_size] = end - start;
+    res[i] = end - start;
   }
 
   // End Tests ------------------------------------------

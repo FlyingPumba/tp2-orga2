@@ -25,42 +25,27 @@ extern hslTOrgb
 
 %define FALSE	0
 
-section .rodata
-
-;checks
-hsl_max_dato: dd 1.0, 360.0, 1.0, 1.0 ; |max_a|max_h|max_s|max_l|
-hsl_min_dato: dd 0.0, 0.0, 0.0, 0.0 ; |0.0|0.0|0.0|0.0|
-hsl_fix_dato: dd 0.0, 360.0, 0.0, 0.0 ; |0.0|360.0|0.0|0.0|
-
 section .text
 
 ASM_hsl1:
 	;stack frame
 	push rbp
 	mov rbp, rsp
+	push r13
 	push r14
 	push r15
 	push rbx
-	sub rsp, 56
+	sub rsp, 16
 	;*****
-
-	;
-	; Variables en la pila:
-	;
-	; hsl_temp_dato: [rsp]
-	; hsl_params_dato: [rsp+16]
-	; hsl_suma_dato: [rsp+32]
-	;
 
 	mov rbx, rdx ; rbx = *data (aumenta en cada ciclo)
 
-	pxor xmm4, xmm4 ; xmm4 |0.0|0.0|0.0|0.0|
 	pslldq xmm0, 4 ; xmm0 |0.0|0.0|HH|0.0|
-	pslldq xmm1, 8 ; xmm1 |0.0|SS|0.0|0.0|
-	pslldq xmm2, 12 ; xmm2 |LL|0.0|0.0|0.0|
-	por xmm4, xmm0
-	por xmm4, xmm1
-	por xmm4, xmm2 ; xmm4 = |LL|SS|HH|0.0|
+	movq r13, xmm0 ; r13 = |HH|0.0|
+
+	pslldq xmm2, 4 ; xmm2 |0.0|0.0|LL|0.0|
+	por xmm2, xmm1 ; xmm2 = |0.0|0.0|LL|SS|
+	movq r14, xmm2 ; r14 = |LL|SS|
 
 	mov rax, rdi ; rax = w
 	mul rsi ; rax = w * h
@@ -68,12 +53,6 @@ ASM_hsl1:
 	mul rsi ; rax = w * h * RGB_PIXEL_SIZE = *data.size()
 	add rax, rbx ; rax = *data.end()
 	mov r15, rax ; r15 = *data.end()
-
-	pxor xmm0, xmm0 ; xmm0 = zeros
-	xor eax, eax ; eax = 0
-	movaps [rsp], xmm0 ; hsl_temp_dato: [rsp] = zeros(float)
-	movaps [rsp+16], xmm4 ; hsl_params_dato: [rsp+16] = |0.0|HH|SS|LL|
-	movaps [rsp+32], xmm0 ; hsl_suma_dato: [rsp+32] = zeros(float)
 
 	.ciclo:
 		cmp rbx, r15
@@ -86,26 +65,34 @@ ASM_hsl1:
 
 		; preparo los datos de la suma
 		movaps xmm0, [rsp] ; xmm0 = |l|s|h|a|
-		movaps xmm1, [rsp+16] ; xmm1 = |LL|SS|HH|0.0|
+
+		movq xmm1, r14 ; xmm1 = |0.0|0.0|LL|SS|
+		movq xmm7, r13 ; xmm7 = |0.0|0.0|HH|0.0|
+		pslldq xmm1, 8 ; xmm1 = |LL|SS|0.0|0.0|
+		por xmm1, xmm7 ; xmm1 = |LL|SS|HH|0.0|
 
 		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-
-		movaps xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal para guardar el valor original de xmm0)
-		movaps xmm5, xmm0 ; xmm5 = |l+LL|s+SS|h+HH|a| (donde guardo el dato)
+		movaps xmm5, xmm0 ; xmm5 = |l+LL|s+SS|h+HH|a| (donde guardo el dato respuesta)
 
 		.check:
 
 			pxor xmm1, xmm1; xmm1 = |0.0|0.0|0.0|0.0|
 			maxps xmm5, xmm1; xmm5 = |max(l+LL,0.0)|max(s+SS,0.0)|max(h+HH,0.0)|max(a,0.0)| = |l2|s2|h2|a2|
 
-			movups xmm1, [hsl_max_dato]; xmm1 = |1.0|1.0|360.0|1.0|
+			mov rax, 0x3f8000003f800000 ; rax = |1.0|1.0|
+			mov rdx, 0x43b400003f800000 ; rdx = |360.0|1.0|
+			movq xmm7, rax
+			movq xmm1, rdx
+			pslldq xmm7, 8
+			addps xmm1, xmm7; xmm1 = |1.0|1.0|360.0|1.0|
+			
 			minps xmm5, xmm1; xmm5 = |min(l2,1.0)|min(s2,1.0)|min(h2,360.0)|min(a2,1.0)| = |l3|s3|h3|a3|
 
 		.check_max:
 
-			psrldq xmm1, 4; xmm1 = |basura...|360.0|
 			psrldq xmm0, 4; xmm0 = |basura...|h+HH|
+			psrldq xmm1, 4; xmm1 = |basura...|360.0|
 			movaps xmm6, xmm0; xmm6 = |basura...|h+HH|
 
 			cmpltss xmm0, xmm1 ; xmm0 = |basura...|h+HH < max_h| (bool)
@@ -116,7 +103,8 @@ ASM_hsl1:
 
 			; caso h+HH >= max_h
 			subss xmm6, xmm1 ; xmm6[0] = h+HH-360.0 = h_valido
-			jmp .save_a
+			insertps xmm5, xmm6, 0x10 ; xmm5[1] = h_valido
+			jmp .fin_ciclo
 
 		.check_min:
 
@@ -127,26 +115,18 @@ ASM_hsl1:
 			movd edi, xmm0; edi = h+HH >= 0.0
 
 			cmp edi, FALSE
-			jne .save_b
+			jne .fin_ciclo
 
 			; caso h+HH < 0.0
 			addss xmm6, xmm1 ; xmm6[0] = h+HH+360.0 = h_valido
-
-		.save_a:
-
-		insertps xmm5, xmm6, 0x10
-		movaps [rsp+32], xmm5 ; [rsp+32] = |a_valido|h_invalido|s_valido|l_valido|
-		;movd [rsp+36], xmm6 ; [rsp+32] = |a_valido|h_valido|s_valido|l_valido|
-		jmp .fin_ciclo
-
-		.save_b:
-
-		movaps [rsp+32], xmm5 ; [rsp+32] = |a_valido|h_valido|s_valido|l_valido|
+			insertps xmm5, xmm6, 0x10 ; xmm5[1] = h_valido
 
 		.fin_ciclo:
 
+		movaps [rsp], xmm5 ; [rsp] = |a_valido|h_valido|s_valido|l_valido|
+
 		;hago la conversion de HSL a RGB
-		lea rdi, [rsp+32] ; *rdi = |a_valido|h_valido|s_valido|l_valido|
+		mov rdi, rsp ; *rdi = |a_valido|h_valido|s_valido|l_valido|
 		mov rsi, rbx ; rsi = rbx
 		call hslTOrgb ; *rbx = |a_final|r_final|g_final|b_final|
 
@@ -156,9 +136,10 @@ ASM_hsl1:
 
 	.fin:
 	;*****
-	add rsp, 56
+	add rsp, 16
 	pop rbx
 	pop r15
 	pop r14
+	pop r13
 	pop rbp
 	ret
