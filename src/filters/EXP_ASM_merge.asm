@@ -5,15 +5,15 @@
 ;                                                                           ;
 ; ************************************************************************* ;
 
-; void ASM_merge1(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value)
-global ASM_merge1
+; void EXP_ASM_merge(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value)
+global EXP_ASM_merge
 %define PIXEL_SIZE 4
 
 section .rodata
     unos: dd 1.0, 1.0, 1.0, 1.0
 
 section .text
-ASM_merge1:
+EXP_ASM_merge:
   push rbp
   mov rbp, rsp
   ;*******
