@@ -35,7 +35,7 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 int main(void)
 {
   FILE *file = fopen("datos_merge.dat", "w+");
-  fprintf(file, "img w h tam v cmerge asm1 asm2 expc expasm\n");
+  fprintf(file, "img\tw\th\ttam\tv\tcmerge\tasm1\tasm2\texpc\texpasm\n");
   DIR *d;
   struct dirent *dir;
   d = opendir(files_path);
@@ -136,7 +136,7 @@ void print_results(FILE* file, unsigned long* res, char* image_name, int w, int 
     /* get the first token */
     strtok(image_name, s);
 
-  fprintf(file, "%s %d %d %d %f ", image_name, w, h, w*h, v);
+  fprintf(file, "%s\t%d\t%d\t%d\t%f ", image_name, w, h, w*h, v);
   for(int i=0;i<func_size;i++) {
     fprintf(file, "%ld ", res[i]);
   }
