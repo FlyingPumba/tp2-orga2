@@ -9,3 +9,7 @@ cpu freq
 taskset --cpu-list 1 my_command 
 /boot/grub/grub.conf /etc/default/grub -> isolcpus
 /etc/default/irqbalance -> IRQBALANCE_BANNED_CPUS
+
+// gnuplot merge
+plot 'datos_merge.dat' using 7:xtic(1) ti col fc rgb "#f00" with histogram, '' u 9 ti col with histogram
+

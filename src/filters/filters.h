@@ -42,10 +42,12 @@ void EXP_C_blur3(uint32_t w, uint32_t h, uint8_t* data);
 void EXP_ASM_blur3(uint32_t w, uint32_t h, uint8_t* data);
 void EXP_ASM_blur4(uint32_t w, uint32_t h, uint8_t* data);
 
-void    C_merge(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
+void C_merge(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
 void ASM_merge1(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
 void ASM_merge2(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
 void ASM_merge3(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
+void EXP_C_merge(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
+void EXP_ASM_merge(uint32_t w, uint32_t h, uint8_t* data1, uint8_t* data2, float value);
 
 void    C_hsl(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
 void ASM_hsl1(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
