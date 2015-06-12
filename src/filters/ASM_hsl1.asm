@@ -75,92 +75,41 @@ ASM_hsl1:
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a|
 		movaps xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal)
 
-		psrldq xmm0, 4; xmm0 = |0|l+LL|s+SS|h+HH|
-		movd [rsp+HSL_OFFSET_HUE], xmm0
-		psrldq xmm0, 4; xmm0 = |0|0|l+LL|s+SS|
-		movd [rsp+HSL_OFFSET_SAT], xmm0
-		psrldq xmm0, 4; xmm0 = |0|0|0|l+LL|
-		movd [rsp+HSL_OFFSET_LUM], xmm0
+		.check:
 
-		.check_max:
-
-			movaps xmm0, xmm2
 			movups xmm6, [hsl_max_dato]
-			cmpltps xmm0, xmm6 ; xmm0 = |l < max_l|s < max_s|h < max_h|a < max_a| (bool)
+			minps xmm0, xmm6 ; que no sea mayor al maximo posible
+			pxor xmm7, xmm7
+			maxps xmm0, xmm7
 
-			psrldq xmm0, 4
-			movd edi, xmm0
-			psrldq xmm0, 4
-			movd esi, xmm0
-			psrldq xmm0, 4
-			movd edx, xmm0
-			
-			.check_max_hue:
-			cmp edi, FALSE
-			jne .check_max_sat ; if ( (h < max_h) == false )
-			movaps xmm1, xmm2 ; xmm1 = |l+LL|s+SS|h+HH|a| (float)
-			subps xmm1, xmm6 ; xmm1 = |l+LL|s+SS|h+HH-360|a| (float)
-			psrldq xmm1, 4
-			movd [rsp+HSL_OFFSET_HUE], xmm1
+			psrldq xmm0, 4; xmm0 = |0|l+LL|s+SS|h+HH|
+			movd [rsp+HSL_OFFSET_HUE], xmm0
+			psrldq xmm0, 4; xmm0 = |0|0|l+LL|s+SS|
+			movd [rsp+HSL_OFFSET_SAT], xmm0
+			psrldq xmm0, 4; xmm0 = |0|0|0|l+LL|
+			movd [rsp+HSL_OFFSET_LUM], xmm0
 
-			.check_max_sat:
-			cmp esi, FALSE
-			jne .check_max_lum ; if ( (s < max_s) == false )
-			mov dword [rsp+HSL_OFFSET_SAT], __float32__(1.0) ; s = max_s
+			psrldq xmm2, 4; xmm2 = |0|l+LL|s+SS|h+HH|
+			movaps xmm3, xmm2; xmm3 = |0|l+LL|s+SS|h+HH|
+			movaps xmm4, xmm2; xmm4 = |0|l+LL|s+SS|h+HH|
+			psrldq xmm6, 4
 
-			.check_max_lum:
-			cmp edx, FALSE
-			jne .check_min ; if ( (l < max_l) == false )
-			mov dword [rsp+HSL_OFFSET_LUM], __float32__(1.0) ; l = max_l
+			.check_max:
+			cmpltss xmm2, xmm6 ; xmm0 = |basura...|h < max_h| (bool)
+			movd eax, xmm2
+			cmp eax, FALSE
+			jne .check_min
+			subss xmm3, xmm6
+			movd [rsp+HSL_OFFSET_HUE], xmm3
+			jmp .fin_ciclo
 
-		.check_min:
-
-			movaps xmm0, xmm2 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
-			pxor xmm1, xmm1
-			cmpnltps xmm0, xmm1 ; xmm0 = |l >= 0.0|s >= 0.0|h >= 0.0|a >= 0.0| (bool)
-
-			psrldq xmm0, 4
-			movd edi, xmm0 ; edi = h >= 0.0
-			psrldq xmm0, 4
-			movd esi, xmm0 ; esi = s >= 0.0
-			psrldq xmm0, 4
-			movd edx, xmm0 ; edx = l >= 0.0
-
-			.check_min_hue:
-			cmp edi, FALSE
-			jne .check_min_sat ; if ( (h >= min_h) == false )
-			addps xmm2, xmm6 ; xmm2 = |l+LL|s+SS|h+HH+360|a| (float)
-			psrldq xmm2, 4
-			movd [rsp+HSL_OFFSET_HUE], xmm2
-
-			.check_min_sat:
-			cmp esi, FALSE
-			jne .check_min_lum ; if ( (s >= min_s) == false )
-			mov dword [rsp+HSL_OFFSET_SAT], 0 ; s = min_s
-
-			.check_min_lum:
-			cmp edx, FALSE
-			jne .fin_ciclo ; if ( (l >= min_l) == false )
-			mov dword [rsp+HSL_OFFSET_LUM], 0 ; l = min_l
-
-		; .check:
-
-		; 	movaps xmm1, xmm0
-
-		; 	pxor xmm2, xmm2; xmm2 = |0.0|0.0|0.0|0.0|
-		; 	cmpnltps xmm0, xmm2 ; xmm0 = |l >= 0.0|s >= 0.0|h >= 0.0|a >= 0.0|
-
-		; 	movups xmm3, [hsl_max_dato]; xmm1 = |1.0|1.0|360.0|1.0|
-		; 	cmpltps xmm1, xmm3; xmm1 = |l < max_l|s < max_s|h < max_h|a < max_a|
-
-		; 	movaps xmm7, xmm5; xmm7 = |l+LL|s+SS|h+HH|a|
-
-		; 	pxor xmm1, xmm0; xmm1 = xmm1 xor xmm0 (hay que hacer algo)
-		; 	pand xmm6, xmm0; xmm6 = S and xmm0 (el signo del numero a sumar es negativo)
-		; 	por xmm3, xmm6; niega el signo de xmm3 (1,1,360,0) si es necesario
-		; 	pand xmm1, xmm3; pone el resultado en xmm1 si habia que hacer algo, sino deja todo en 0
-
-		; 	addps xmm7, xmm1; le suma 0, 360 o -360 segun corresponda
+			.check_min:
+			cmpnltss xmm4, xmm7 ; xmm0 = |basura...|h >= 0.0| (bool)
+			movd eax, xmm4
+			cmp eax, FALSE
+			jne .fin_ciclo
+			addss xmm3, xmm6
+			movd [rsp+HSL_OFFSET_HUE], xmm3
 
 		.fin_ciclo:
 
