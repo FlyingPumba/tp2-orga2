@@ -11,11 +11,11 @@
 #include "../filters/filters.h"
 #include "rdtsc.h"
 
-#define func_hsl_size 3
-#define func_size 3
+#define func_size 6
+#define muestras 50
 
 static const char* files_path = "img/";
-static const void (*func_hsl[func_hsl_size])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1, ASM_hsl2};
+static const void (*func_hsl[func_size])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1_1, ASM_hsl1_2, ASM_hsl1_3, ASM_hsl1_4, ASM_hsl2};
 
 void execute_exp(BMP*, unsigned long*);
 void print_results(FILE*, unsigned long*, char*, int, int);
@@ -26,7 +26,7 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 int main(void)
 {
   FILE *file = fopen("datos_hsl.dat", "w+");
-  fprintf(file, "img w h tam chsl asm1hsl asm2hsl\n");
+  fprintf(file, "img hsl_c hsl_asm1_1 hsl_asm1_2 hsl_asm1_3 hsl_asm1_4 hsl_asm2 \n");
   DIR *d;
   struct dirent *dir;
   d = opendir(files_path);
@@ -38,8 +38,8 @@ int main(void)
         strcat(path, dir->d_name);
         BMP* img = bmp_read(path);
         printf("Ejecutando: %s \n", dir->d_name);
-        unsigned long tiempos[func_size][30];
-        for (int i=0; i<30; i++){
+        unsigned long tiempos[func_size][muestras];
+        for (int i=0; i<muestras; i++){
           unsigned long temp[func_size];
           execute_exp(img, temp);
           for (int j=0; j<func_size; j++){
@@ -47,13 +47,14 @@ int main(void)
           }
         }
         for (int i=0; i<func_size; i++){
-          qsort(tiempos[i], 30, sizeof(unsigned long), longcmp);
+          qsort(tiempos[i], muestras, sizeof(unsigned long), longcmp);
         }
         unsigned long res[func_size];
         for (int i=0; i<func_size; i++){
           res[i] = 0;
+          int start = (muestras/2)-5;
           for (int j=0; j<10; j++){
-            res[i] += tiempos[i][j+10];
+            res[i] += tiempos[i][j+start];
           }
           res[i] = res[i]/10;
         }
@@ -74,17 +75,14 @@ void execute_exp(BMP* img, unsigned long* res)
   uint32_t h = *(bmp_get_h(img));
   uint32_t w = *(bmp_get_w(img));
   uint8_t *data1s[func_size];
-  uint8_t *data2s[func_size];
   for (int i=0; i<func_size ;i++){
     bmps[i] = bmp_copy(img, 1);
     if(bmps[i]==0) {return;}
     uint8_t* data = bmp_get_data(bmps[i]);
     if(w%4!=0) {return;}
     data1s[i] = malloc(sizeof(uint8_t)*4*h*w);
-    data2s[i] = malloc(sizeof(uint8_t)*4*h*w);
     if(*(bmp_get_bitcount(bmps[i])) == 24) {
       to32(w,h,data,data1s[i]);
-      to32(w,h,data,data2s[i]);
     } else {
       copy_data(w,h,data,data1s[i]);
       copy_data(w,h,data,data1s[i]);
@@ -95,7 +93,7 @@ void execute_exp(BMP* img, unsigned long* res)
   // Tests ------------------------------------------
 
   // Hsl
-  for (int i=0; i<func_hsl_size; i++){
+  for (int i=0; i<func_size; i++){
     serialize();
     unsigned long start, end;
     RDTSC_START(start);
@@ -110,7 +108,6 @@ void execute_exp(BMP* img, unsigned long* res)
   for (int i=0; i<func_size ;i++){
     if(*(bmp_get_bitcount(bmps[i])) == 24) {
       free(data1s[i]);
-      free(data2s[i]);
     }
     bmp_delete(bmps[i]);
   }
@@ -118,7 +115,7 @@ void execute_exp(BMP* img, unsigned long* res)
 
 void print_results(FILE* file, unsigned long* res, char* image_name, int w, int h)
 {
-  fprintf(file, "%s %d %d %d ", image_name, w, h, w*h);
+  fprintf(file, "%s ", image_name);
   for(int i=0;i<func_size;i++) {  
     fprintf(file, "%ld ", res[i]);
   }

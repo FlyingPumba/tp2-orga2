@@ -114,8 +114,8 @@ ASM_hsl1_3:
 
 		psrldq xmm0, 4; xmm0 = |0.0|0.0|0.0|l+LL|
 
-		minss xmm1, xmm7 ; me aseguro que no sea mayor a 1.0
-		maxss xmm1, xmm6 ; me aseguro que no sea menor a 0.0
+		minss xmm0, xmm7 ; me aseguro que no sea mayor a 1.0
+		maxss xmm0, xmm6 ; me aseguro que no sea menor a 0.0
 
 		movss DWORD [rsp+HSL_OFFSET_LUM], xmm0 ; [rsp] = |a|h_final|s_final|l_final|
 

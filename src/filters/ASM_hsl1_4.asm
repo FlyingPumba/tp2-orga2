@@ -35,21 +35,19 @@ ASM_hsl1_4:
 	;stack frame
 	push rbp
 	mov rbp, rsp
-	push r13
-	push r14
 	push r15
 	push rbx
-	sub rsp, 16
+	sub rsp, 32
 	;*****
 
 	mov rbx, rdx ; rbx = *data (aumenta en cada ciclo)
 
 	pslldq xmm0, 4 ; xmm0 |0.0|0.0|HH|0.0|
-	movq r13, xmm0 ; r13 = |HH|0.0|
-
-	pslldq xmm2, 4 ; xmm2 |0.0|0.0|LL|0.0|
-	por xmm2, xmm1 ; xmm2 = |0.0|0.0|LL|SS|
-	movq r14, xmm2 ; r14 = |LL|SS|
+	pslldq xmm1, 8 ; xmm1 |0.0|SS|0.0|0.0|
+	pslldq xmm2, 12 ; xmm2 |LL|0.0|0.0|0.0|
+	por xmm1, xmm0
+	por xmm2, xmm1; xmm2 |LL|SS|HH|0.0|
+	movdqu [rsp+16], xmm2 ; [rsp+16] = |0.0|HH|SS|LL|
 
 	mov rax, rdi ; rax = w
 	mul rsi ; rax = w * h
@@ -70,10 +68,9 @@ ASM_hsl1_4:
 		; preparo los datos de la suma
 		movaps xmm0, [rsp] ; xmm0 = |l|s|h|a|
 
-		movq xmm1, r14 ; xmm1 = |0.0|0.0|LL|SS|
-		movq xmm7, r13 ; xmm7 = |0.0|0.0|HH|0.0|
-		pslldq xmm1, 8 ; xmm1 = |LL|SS|0.0|0.0|
-		por xmm1, xmm7 ; xmm1 = |LL|SS|HH|0.0|
+		; consigo los parametros de entrada
+		; [rsp+16] = |0.0|HH|SS|LL|
+		movdqu xmm1, [rsp+16] ; xmm1 = |LL|SS|HH|0.0|
 
 		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a| (float)
@@ -134,10 +131,8 @@ ASM_hsl1_4:
 
 	.fin:
 	;*****
-	add rsp, 16
+	add rsp, 32
 	pop rbx
 	pop r15
-	pop r14
-	pop r13
 	pop rbp
 	ret
