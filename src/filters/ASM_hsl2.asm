@@ -317,7 +317,6 @@ rgbTOhsl:
     jne .rgbTOhsl_max_g
 	; cmax == R
 	psrldq xmm4, 8 ; xmm4 = | 0 | 0 | 60 * ((R-G)/d + 4) | 60 * ((G-B)/d + 6) | (floats SP)
-	movd edx, xmm4 ; edx = 60 * ((G-B)/d + 6) (float SP)
     jmp .rgbTOhsl_h_360
 
     .rgbTOhsl_max_g:
@@ -325,26 +324,28 @@ rgbTOhsl:
     jne .rgbTOhsl_max_b
 	; cmax == G
 	psrldq xmm4, 4 ; xmm4 = | 0 | 60 * ((R-G)/d + 4) | 60 * ((G-B)/d + 6) | 60 * ((B-R)/d + 2) | (floats SP)
-	movd edx, xmm4 ; edx = 60 * ((B-R)/d + 2) (float SP)
 	jmp .rgbTOhsl_h_360
 
     .rgbTOhsl_max_b:
 	; cmax == B
 	psrldq xmm4, 12 ; xmm4 = | 0 | 0 | 0 | 60 * ((R-G)/d + 4) | (floats SP)
-	movd edx, xmm4 ; edx = 60 * ((R-G)/d + 4) (float SP)
 
     .rgbTOhsl_h_360:
-    cmp edx, 360
-    jl .rgbTOhsl_h_menor_360
-	movd xmm1, edx ; xmm1 = | 0 | 0 | 0 | H | (float SP)
-	movdqu xmm2, [hsl_sub_360] ; xmm2 = | 0.0 | 0.0 | 0.0 | 360.0 |
-	subps xmm1, xmm2 ; xmm1 = | 0 | 0 | 0 | H-360 | (float SP)
+    pxor xmm1, xmm1
+	movss xmm1, xmm4 ; xmm1 = |0|0|0|H|
+	mov edx, __float32__(360.0)
+	movd xmm2, edx ; xmm1 = |0|0|0|360.0|
+	cmpltss xmm4, xmm2 ; xmm4[0] = H < 360.0
+	movd edx, xmm4 ; edx = H < 360.0
+
+    cmp edx, FALSE
+    jne .rgbTOhsl_h_menor_360
+	subss xmm1, xmm2 ; xmm1 = | 0 | 0 | 0 | H-360 | (float SP)
 	pslldq xmm1, 4 ; xmm1 = | 0 | 0 | H-360 | 0 | (float SP)
 	addps xmm14, xmm1 ; xmm14 = | L | S | H | 0 |
 	jmp .rgbTOhsl_fin
 
     .rgbTOhsl_h_menor_360:
-	movd xmm1, edx ; xmm1 = | 0 | 0 | 0 | H | (float SP)
 	pslldq xmm1, 4 ; xmm1 = | 0 | 0 | H | 0 | (float SP)
 	addps xmm14, xmm1 ; xmm14 = | L | S | H | 0 |
 
