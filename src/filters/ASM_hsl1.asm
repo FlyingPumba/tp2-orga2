@@ -47,7 +47,7 @@ ASM_hsl1:
 	pslldq xmm2, 12 ; xmm2 |LL|0.0|0.0|0.0|
 	por xmm1, xmm0
 	por xmm2, xmm1; xmm2 |LL|SS|HH|0.0|
-	movaps [rsp+16], xmm2
+	movdqu [rsp+16], xmm2
 
 	mov rax, rdi ; rax = w
 	mul rsi ; rax = w * h
@@ -66,21 +66,21 @@ ASM_hsl1:
 		call rgbTOhsl ; [rsp] = |a|h|s|l|
 
 		; preparo los datos de la suma
-		movaps xmm0, [rsp] ; xmm0 = |l|s|h|a|
+		movdqu xmm0, [rsp] ; xmm0 = |l|s|h|a|
 
 		; consigo los parametros de entrada
-		movaps xmm1, [rsp+16] ; xmm1 = |LL|SS|HH|0.0|
+		movdqu xmm1, [rsp+16] ; xmm1 = |LL|SS|HH|0.0|
 
 		; hago la suma de floats
 		addps xmm0, xmm1 ; xmm0 = |l+LL|s+SS|h+HH|a|
-		movaps xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal)
+		movdqu xmm2, xmm0 ; xmm2 = |l+LL|s+SS|h+HH|a| (temporal)
 
 		.check:
 
-			movups xmm6, [hsl_max_dato]
-			minps xmm0, xmm6 ; que no sea mayor al maximo posible
-			pxor xmm7, xmm7
-			maxps xmm0, xmm7
+			movups xmm6, [hsl_max_dato]; xmm6 = |1|1|360|1|
+			minps xmm0, xmm6 ; me aseguro que los 4 floats de xmm0 no se pasen del maximo
+			pxor xmm7, xmm7; xmm7 = |0|0|0|0|
+			maxps xmm0, xmm7 ; me aseguro que los 4 floats de xmm0 no sean menores que el minimo
 
 			psrldq xmm0, 4; xmm0 = |0|l+LL|s+SS|h+HH|
 			movd [rsp+HSL_OFFSET_HUE], xmm0
@@ -90,9 +90,9 @@ ASM_hsl1:
 			movd [rsp+HSL_OFFSET_LUM], xmm0
 
 			psrldq xmm2, 4; xmm2 = |0|l+LL|s+SS|h+HH|
-			movaps xmm3, xmm2; xmm3 = |0|l+LL|s+SS|h+HH|
-			movaps xmm4, xmm2; xmm4 = |0|l+LL|s+SS|h+HH|
-			psrldq xmm6, 4
+			movdqu xmm3, xmm2; xmm3 = |0|l+LL|s+SS|h+HH|
+			movdqu xmm4, xmm2; xmm4 = |0|l+LL|s+SS|h+HH|
+			psrldq xmm6, 4; xmm6 = |0|1|1|360|
 
 			.check_max:
 			cmpltss xmm2, xmm6 ; xmm0 = |basura...|h < max_h| (bool)
