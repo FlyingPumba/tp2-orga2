@@ -56,6 +56,8 @@ void ASM_hsl1_2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float
 void ASM_hsl1_3(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
 void ASM_hsl1_4(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
 void ASM_hsl2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
+void ASM_hsl2_1(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
+void ASM_hsl2_2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll);
 
 void rgbTOhsl(uint8_t *src, float *dst);
 void hslTOrgb(float *src, uint8_t *dst);

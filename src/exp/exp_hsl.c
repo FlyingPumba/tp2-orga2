@@ -11,11 +11,11 @@
 #include "../filters/filters.h"
 #include "rdtsc.h"
 
-#define func_size 6
+#define func_size 7
 #define muestras 50
 
 static const char* files_path = "img/";
-static const void (*func_hsl[func_size])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1_1, ASM_hsl1_2, ASM_hsl1_3, ASM_hsl1_4, ASM_hsl2};
+static const void (*func_hsl[func_size])(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll) = {C_hsl, ASM_hsl1_1, ASM_hsl1_2, ASM_hsl1_3, ASM_hsl1_4, ASM_hsl2_1, ASM_hsl2_2};
 
 void execute_exp(BMP*, unsigned long*);
 void print_results(FILE*, unsigned long*, char*, int, int);
@@ -26,7 +26,7 @@ void copy_data(uint32_t w, uint32_t h, uint8_t* src, uint8_t* dst);
 int main(void)
 {
   FILE *file = fopen("datos_hsl.dat", "w+");
-  fprintf(file, "img hsl_c hsl_asm1_1 hsl_asm1_2 hsl_asm1_3 hsl_asm1_4 hsl_asm2 \n");
+  fprintf(file, "img c asm1_1 asm1_2 asm1_3 asm1_4 asm2_1 asm2_2 \n");
   DIR *d;
   struct dirent *dir;
   d = opendir(files_path);

@@ -5,8 +5,8 @@
 ;                                                                           ;
 ; ************************************************************************* ;
 
-; void ASM_hsl2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
-global ASM_hsl2
+; void ASM_hsl2_1(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
+global ASM_hsl2_1
 %define RGB_PIXEL_SIZE     	4
 %define RGB_OFFSET_ALPHA 	0
 %define RGB_OFFSET_RED      1
@@ -50,7 +50,7 @@ hsl_const_360: dd 360.0, 0.0, 0.0, 0.0
 
 section .text
 
-ASM_hsl2:
+ASM_hsl2_1:
 	;stack frame
 	push rbp
 	mov rbp, rsp
