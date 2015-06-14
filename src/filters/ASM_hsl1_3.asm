@@ -25,10 +25,6 @@ extern hslTOrgb
 
 %define FALSE	0
 
-section .rodata
-
-hsl_max_dato: dd 1.0,360.0,1.0,1.0
-
 section .text
 
 ASM_hsl1_3:

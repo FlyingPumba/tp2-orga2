@@ -5,8 +5,8 @@
 ;                                                                           ;
 ; ************************************************************************* ;
 
-; void ASM_hsl1(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
-global ASM_hsl1
+; void ASM_hsl1_1(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
+global ASM_hsl1_1
 
 extern rgbTOhsl
 extern hslTOrgb
@@ -31,7 +31,7 @@ hsl_max_dato: dd 1.0,360.0,1.0,1.0
 
 section .text
 
-ASM_hsl1:
+ASM_hsl1_1:
 	;stack frame
 	push rbp
 	mov rbp, rsp

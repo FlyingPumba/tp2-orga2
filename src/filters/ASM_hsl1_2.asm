@@ -5,8 +5,8 @@
 ;                                                                           ;
 ; ************************************************************************* ;
 
-; void ASM_hsl1_3(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
-global ASM_hsl1_3
+; void ASM_hsl1_2(uint32_t w, uint32_t h, uint8_t* data, float hh, float ss, float ll)
+global ASM_hsl1_2
 
 extern rgbTOhsl
 extern hslTOrgb
@@ -25,13 +25,9 @@ extern hslTOrgb
 
 %define FALSE	0
 
-section .rodata
-
-hsl_max_dato: dd 1.0,360.0,1.0,1.0
-
 section .text
 
-ASM_hsl1_3:
+ASM_hsl1_2:
 	;stack frame
 	push rbp
 	mov rbp, rsp
