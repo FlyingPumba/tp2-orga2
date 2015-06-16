@@ -25,7 +25,7 @@ void EXP_C_blur3( uint32_t w, uint32_t h, uint8_t* data ) {
                 m_row_1[iw][0] = m[ih][iw][0];
             }
             for(iw=1;iw<(int)w-1;iw++) {
-                m[ih][iw][0] = ( (int)m_row_0[iw-1][0] + (int)m_row_0[iw][0] ) / 9;
+                m[ih][iw][0] = ( (int)m_row_0[iw-1][0] + (int)m_row_0[iw][0] ) / 2;
             }
         }
     free(m_row_0);
