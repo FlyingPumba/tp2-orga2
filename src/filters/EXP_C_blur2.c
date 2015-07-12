@@ -29,13 +29,13 @@ void EXP_C_blur2( uint32_t w, uint32_t h, uint8_t* data ) {
             //}
         }
         for(iw=1;iw<(int)w-1;iw++) {
-            //for(ii=0;ii<4;ii++) {
+            for(ii=0;ii<4;ii++) {
                 m[ih][iw][0] = (
                     (int)m_row_0[iw-1][0] + (int)m_row_0[iw][0] + (int)m_row_0[iw+1][0] +
                     (int)m_row_1[iw-1][0] + (int)m_row_1[iw][0] + (int)m_row_1[iw+1][0] +
                     (int)m[ih+1][iw-1][0] + (int)m[ih+1][iw][0] + (int)m[ih+1][iw+1][0] ) / 9;
                 }
-            //}
+            }
         }
         free(m_row_0);
         free(m_row_1);
