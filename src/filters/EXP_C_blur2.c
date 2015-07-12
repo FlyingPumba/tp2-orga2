@@ -9,7 +9,7 @@
 
 void EXP_C_blur2( uint32_t w, uint32_t h, uint8_t* data ) {
 
-    int ih,iw;
+    int ih,iw,ii;
     uint8_t (*m)[w][4] = (uint8_t (*)[w][4]) data;
     uint8_t (*m_row_0)[4] = (uint8_t (*)[4]) malloc(w*4);
     uint8_t (*m_row_1)[4] = (uint8_t (*)[4]) malloc(w*4);
